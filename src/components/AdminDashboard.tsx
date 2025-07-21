@@ -5,6 +5,7 @@ import {
   Calendar, Users, Package, CheckCircle, Clock, AlertCircle, DollarSign, UserCheck, ArrowRight, Settings, XCircle
 } from 'lucide-react';
 import { User, BookingRequest, VendorTask } from '../types';
+import CatalogManager from './CatalogManager';
 
 interface AdminDashboardProps {
   user: User;
@@ -17,7 +18,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<BookingRequest | null>(null);
 
-  // This hook sets up the real-time listeners. It runs only once.
   useEffect(() => {
     const unsubBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
       const bookingsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BookingRequest));
@@ -43,16 +43,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
     };
   }, []);
 
-  // *** THIS NEW HOOK IS THE DEFINITIVE FIX FOR THE STATUS REVERTING BUG ***
-  // It runs ONLY when the main 'bookings' list changes from Firestore.
-  // It correctly syncs the detailed view ('selectedBooking') with the main list.
   useEffect(() => {
     if (selectedBooking?.id) {
-      const updatedData = bookings.find(b => b.id === selectedBooking.id);
-      setSelectedBooking(updatedData || null);
+      const updatedBooking = bookings.find(b => b.id === selectedBooking.id);
+      setSelectedBooking(updatedBooking || null);
     }
   }, [bookings]);
-
 
   const updateBookingStatus = async (bookingId: string, newStatus: BookingRequest['status']) => {
     if (!bookingId) return;
@@ -61,7 +57,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   };
 
   const assignVendor = async (booking: BookingRequest, vendorId: string, category: string) => {
-     if (!vendorId || !booking) return;
+    if (!vendorId || !booking) return;
     const vendor = vendors.find(v => v.uid === vendorId);
     if (!vendor) return;
     try {
@@ -94,6 +90,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
       default: return <AlertCircle className="w-5 h-5 text-gray-500" />;
     }
   };
+
   const getStatusColor = (status: BookingRequest['status']) => {
     switch (status) {
       case 'pending': return 'bg-orange-100 text-orange-700 border-orange-200';
@@ -104,11 +101,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
       default: return 'bg-gray-100 text-gray-700 border-gray-200';
     }
   };
+
   const formatDate = (dateString: any) => {
     const date = dateString?.seconds ? new Date(dateString.seconds * 1000) : new Date(dateString);
     if (isNaN(date.getTime())) return "Invalid Date";
     return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   };
+  
   const stats = { totalBookings: bookings.length, pendingBookings: bookings.filter(b => b.status === 'pending').length, totalRevenue: bookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0), activeVendors: vendors.length };
   
   if (loading) return <div className="p-8 text-center">Loading Admin Dashboard...</div>;
@@ -177,6 +176,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
           )}
         </div>
       </div>
+
+      <CatalogManager />
+
     </div>
   );
 };
