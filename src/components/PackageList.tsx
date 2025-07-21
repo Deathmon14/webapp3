@@ -6,10 +6,14 @@ import { db } from '../lib/firebase';
 import { EventPackage } from '../types';
 import { Trash2, Edit } from 'lucide-react';
 
-const PackageList = () => {
+// Add onEdit to the props interface
+interface PackageListProps {
+  onEdit: (pkg: EventPackage) => void;
+}
+
+const PackageList: React.FC<PackageListProps> = ({ onEdit }) => {
   const [packages, setPackages] = useState<EventPackage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'packages'), (snapshot) => {
@@ -18,15 +22,14 @@ const PackageList = () => {
       setLoading(false);
     }, (err) => {
       console.error("Error fetching packages:", err);
-      setError('Failed to load packages.');
       setLoading(false);
     });
 
-    return () => unsub(); // Cleanup listener on unmount
+    return () => unsub();
   }, []);
 
   const handleDelete = async (packageId: string) => {
-    if (window.confirm('Are you sure you want to delete this package? This action cannot be undone.')) {
+    if (window.confirm('Are you sure you want to delete this package?')) {
       try {
         await deleteDoc(doc(db, 'packages', packageId));
         alert('Package deleted successfully.');
@@ -53,7 +56,8 @@ const PackageList = () => {
                 <p className="text-sm text-gray-600">${pkg.basePrice.toLocaleString()}</p>
               </div>
               <div className="flex items-center space-x-3">
-                <button className="text-gray-500 hover:text-blue-600" title="Edit (coming soon)">
+                {/* Updated button with onClick handler */}
+                <button onClick={() => onEdit(pkg)} className="text-gray-500 hover:text-blue-600" title="Edit">
                   <Edit className="w-5 h-5" />
                 </button>
                 <button onClick={() => handleDelete(pkg.id)} className="text-gray-500 hover:text-red-600" title="Delete">
@@ -63,7 +67,7 @@ const PackageList = () => {
             </div>
           ))
         ) : (
-          <p className="text-center text-gray-500">No event packages found. Add one using the form above.</p>
+          <p className="text-center text-gray-500">No event packages found.</p>
         )}
       </div>
     </div>
