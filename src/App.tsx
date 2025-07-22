@@ -124,7 +124,7 @@ function App() {
                 <Calendar className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                EventEase
+                KAISRI 
               </h1>
             </div>
             <div className="hidden md:flex items-center space-x-4">

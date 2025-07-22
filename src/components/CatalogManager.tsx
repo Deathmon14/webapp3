@@ -1,47 +1,62 @@
 // src/components/CatalogManager.tsx
 
 import React, { useState } from 'react';
+import { EventPackage, CustomizationOption } from '../types';
 import AddPackageForm from './AddPackageForm';
 import PackageList from './PackageList';
-import EditPackageForm from './EditPackageForm'; // Import the new component
-import { EventPackage } from '../types'; // Import the type
+import EditPackageForm from './EditPackageForm';
+import AddCustomizationOptionForm from './AddCustomizationOptionForm';
+import CustomizationOptionList from './CustomizationOptionList';
 
 const CatalogManager: React.FC = () => {
-  // State to hold the package currently being edited
   const [editingPackage, setEditingPackage] = useState<EventPackage | null>(null);
+  const [editingOption, setEditingOption] = useState<CustomizationOption | null>(null);
 
-  const handleEdit = (pkg: EventPackage) => {
+  const handleEditPackage = (pkg: EventPackage) => {
     setEditingPackage(pkg);
+    setEditingOption(null); // Close other form if open
   };
 
-  const handleCancelEdit = () => {
+  const handleEditOption = (option: CustomizationOption) => {
+    setEditingOption(option);
+    setEditingPackage(null); // Close other form if open
+  };
+
+  const handleCancel = () => {
     setEditingPackage(null);
+    setEditingOption(null);
   };
 
   const handleUpdate = () => {
-    setEditingPackage(null); // Close the form after a successful update
+    setEditingPackage(null);
+    setEditingOption(null);
   };
 
   return (
     <div className="mt-8 bg-white rounded-2xl shadow-lg p-6">
-      <h3 className="text-xl font-bold text-gray-900 mb-6">Catalog Management</h3>
-      <p className="text-gray-600 mb-4">
-        Add, edit, or remove event packages that are available for clients to book.
-      </p>
+      <h3 className="text-xl font-bold text-gray-900 mb-2">Catalog Management</h3>
       
-      {/* Conditionally render Add or Edit form */}
-      {editingPackage ? (
-        <EditPackageForm 
-          pkg={editingPackage} 
-          onUpdate={handleUpdate} 
-          onCancel={handleCancelEdit} 
-        />
-      ) : (
-        <AddPackageForm />
-      )}
-      
-      {/* Pass the handleEdit function to the PackageList */}
-      <PackageList onEdit={handleEdit} />
+      {/* --- Package Management --- */}
+      <div className="mt-6">
+        <h4 className="text-lg font-semibold text-gray-800">Event Packages</h4>
+        {editingPackage ? (
+          <EditPackageForm pkg={editingPackage} onUpdate={handleUpdate} onCancel={handleCancel} />
+        ) : (
+          !editingOption && <AddPackageForm /> // Only show when not editing anything
+        )}
+        <PackageList onEdit={handleEditPackage} />
+      </div>
+
+      {/* --- Customization Options Management --- */}
+      <div className="mt-10 border-t pt-6">
+        <h4 className="text-lg font-semibold text-gray-800">Customization Options</h4>
+        {editingOption ? (
+          <p className="text-center text-gray-500 p-4">Edit form for options coming soon!</p>
+        ) : (
+          !editingPackage && <AddCustomizationOptionForm /> // Only show when not editing anything
+        )}
+        <CustomizationOptionList onEdit={handleEditOption} />
+      </div>
     </div>
   );
 };

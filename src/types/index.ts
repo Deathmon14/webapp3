@@ -36,6 +36,7 @@ export interface BookingRequest {
   status: 'pending' | 'confirmed' | 'in-progress' | 'completed'| 'rejected';
   createdAt: any;
   requirements: string;
+  guestCount: number; // Add this line
 }
 
 export interface VendorTask {
@@ -56,4 +57,19 @@ export interface VendorAssignment {
   vendorName: string;
   category: string;
   status: 'assigned' | 'in-progress' | 'completed';
+}
+
+export interface Wishlist {
+  userId: string;
+  packageIds: string[];
+}
+
+export interface Review {
+  id: string;
+  packageId: string;
+  clientId: string;
+  clientName: string;
+  rating: number;
+  comment: string;
+  createdAt: any;
 }
