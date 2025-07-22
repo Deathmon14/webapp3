@@ -73,3 +73,12 @@ export interface Review {
   comment: string;
   createdAt: any;
 }
+
+export interface Notification {
+  id: string;
+  userId: string;
+  message: string;
+  isRead: boolean;
+  createdAt: any;
+  link?: string; // Optional link to a booking or task
+}

@@ -53,7 +53,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   const updateBookingStatus = async (bookingId: string, newStatus: BookingRequest['status']) => {
     if (!bookingId) return;
     const bookingDocRef = doc(db, 'bookings', bookingId);
-    await updateDoc(bookingDocRef, { status: newStatus });
+    
+    try {
+      await updateDoc(bookingDocRef, { status: newStatus });
+
+      // --- NEW: Create a notification for the client ---
+      const booking = bookings.find(b => b.id === bookingId);
+      if (booking) {
+        const message = `The status of your booking for "${booking.packageName}" has been updated to ${newStatus.replace('-', ' ')} .`; // Format message nicely
+        await addDoc(collection(db, 'notifications'), {
+          userId: booking.clientId,
+          message: message,
+          isRead: false,
+          createdAt: serverTimestamp(),
+          link: `/booking/${bookingId}` // Example link to the booking details page
+        });
+      }
+      // Consider adding a success alert here if desired, e.g., alert("Booking status updated and client notified!");
+    } catch (error) {
+      console.error("Error updating status or creating notification:", error);
+      alert("Failed to update status. Please try again."); // More user-friendly error message
+    }
   };
 
   const assignVendor = async (booking: BookingRequest, vendorId: string, category: string) => {
@@ -70,6 +90,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
       alert(`${vendor.name} has been assigned.`);
     } catch (error) {
       console.error("Error assigning vendor:", error);
+      alert("Failed to assign vendor. Please try again.");
     }
   };
 
