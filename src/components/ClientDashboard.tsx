@@ -2,27 +2,28 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, serverTimestamp, doc, getDoc, setDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Package, Star, ArrowRight, Check, Image, Users, Heart, Search, Eye, X, Calendar, Briefcase, XCircle, MessageSquare } from 'lucide-react';
-import { User, EventPackage, CustomizationOption, BookingRequest } from '../types';
+import { User, EventPackage, CustomizationOption, BookingRequest, Review } from '../types';
 
 interface ClientDashboardProps {
   user: User;
 }
 
 const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
+  // All state declarations remain the same
   const [eventPackages, setEventPackages] = useState<EventPackage[]>([]);
   const [customizationOptions, setCustomizationOptions] = useState<CustomizationOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [bookings, setBookings] = useState<BookingRequest[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [selectedBookingForReview, setSelectedBookingForReview] = useState<BookingRequest | null>(null);
   const [view, setView] = useState<'all' | 'saved' | 'bookings'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'default' | 'price-asc' | 'price-desc'>('default');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-
-  // --- NEW STATE FOR CHAT MODAL ---
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedBookingForChat, setSelectedBookingForChat] = useState<BookingRequest | null>(null);
-
   const [selectedPackage, setSelectedPackage] = useState<EventPackage | null>(null);
   const [selectedCustomizations, setSelectedCustomizations] = useState<CustomizationOption[]>([]);
   const [guestCount, setGuestCount] = useState(50);
@@ -31,85 +32,82 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
   const [currentStep, setCurrentStep] = useState<'packages' | 'customize' | 'book'>('packages');
 
   useEffect(() => {
+    // --- CORRECTED AND SIMPLIFIED DATA FETCHING LOGIC ---
     const fetchStaticData = async () => {
-      setLoading(true); // Indicate loading start
       try {
-        const packagesCol = collection(db, 'packages');
-        const packagesSnapshot = await getDocs(packagesCol);
+        const packagesSnapshot = await getDocs(collection(db, 'packages'));
         setEventPackages(packagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as EventPackage));
 
-        const optionsCol = collection(db, 'customizationOptions');
-        const optionsSnapshot = await getDocs(optionsCol);
+        const optionsSnapshot = await getDocs(collection(db, 'customizationOptions'));
         setCustomizationOptions(optionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as CustomizationOption));
 
-        const wishlistDocRef = doc(db, 'wishlists', user.uid);
-        const wishlistDoc = await getDoc(wishlistDocRef);
-        if (wishlistDoc.exists()) {
-          setWishlist(wishlistDoc.data().packageIds || []);
-        }
+        const wishlistDoc = await getDoc(doc(db, 'wishlists', user.uid));
+        if (wishlistDoc.exists()) setWishlist(wishlistDoc.data().packageIds || []);
+        
+        const reviewsSnapshot = await getDocs(collection(db, 'reviews'));
+        setReviews(reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Review));
+
       } catch (error) {
-        console.error("Error fetching static data: ", error);
+        console.error("Error fetching static data:", error);
       }
-      // Note: setLoading(false) is handled by the onSnapshot listener's initial call
     };
 
+    // First, fetch all the data that doesn't need to be real-time
     fetchStaticData();
 
-    const bookingsQuery = query(
-      collection(db, 'bookings'),
-      where('clientId', '==', user.uid),
-      orderBy('createdAt', 'desc')
-    );
+    // Then, set up the real-time listener for bookings
+    const bookingsQuery = query(collection(db, 'bookings'), where('clientId', '==', user.uid), orderBy('createdAt', 'desc'));
     
-    // Set up real-time listener for bookings
     const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
-      setBookings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BookingRequest)));
-      setLoading(false); // Set loading to false once initial data is received
+      setBookings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BookingRequest));
+      setLoading(false); // The component is ready to be displayed
     }, (error) => {
       console.error("Error fetching bookings in real-time:", error);
-      setLoading(false); // Ensure loading is off even on error
+      setLoading(false); // Stop loading even if there's an error
     });
 
-    // Cleanup the listener when the component unmounts
-    return () => unsubscribe();
-
+    return () => unsubscribe(); // Cleanup the real-time listener
   }, [user.uid]);
 
-  const handleBooking = async () => {
-    if (!selectedPackage || !eventDate) {
-      alert('Please select a package and an event date.');
-      return;
-    }
+  const handleReviewSubmit = async (rating: number, comment: string) => {
+    if (!selectedBookingForReview) return;
     try {
-      await addDoc(collection(db, 'bookings'), {
+      const newReviewData = {
+        packageId: selectedBookingForReview.packageId,
         clientId: user.uid,
         clientName: user.name,
-        packageId: selectedPackage.id,
-        packageName: selectedPackage.name,
-        customizations: selectedCustomizations.map(({ id, category, name, price }) => ({ id, category, name, price })),
-        totalPrice: getTotalPrice(),
-        eventDate: eventDate,
-        status: 'pending' as const,
+        rating,
+        comment,
         createdAt: serverTimestamp(),
-        requirements: requirements,
-        guestCount: guestCount,
-      });
-
-      alert('Booking request submitted successfully! Our team will contact you soon.');
+      };
+      const docRef = await addDoc(collection(db, 'reviews'), newReviewData);
       
-      setCurrentStep('packages');
-      setView('bookings'); // Switch to the bookings tab to show the new booking
-      setSelectedPackage(null);
-      setSelectedCustomizations([]);
-      setEventDate('');
-      setRequirements('');
+      // Optimistically add new review to local state for immediate UI update
+      setReviews(prev => [...prev, { 
+        ...newReviewData, 
+        id: docRef.id, 
+        createdAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 } // Approximate timestamp for local display
+      } as Review]); // Cast to Review type
 
+      alert('Thank you for your review!');
+      setIsReviewOpen(false);
+      setSelectedBookingForReview(null);
     } catch (error) {
-      console.error("Error creating booking: ", error);
-      alert('There was an error submitting your booking. Please try again.');
+      console.error("Error submitting review:", error);
+      alert("Failed to submit review. Please try again.");
     }
   };
-  
+
+  const getPackageRating = (packageId: string) => {
+    const relevantReviews = reviews.filter(r => r.packageId === packageId);
+    if (relevantReviews.length === 0) return { average: 0, count: 0 };
+    const total = relevantReviews.reduce((sum, r) => sum + r.rating, 0);
+    return {
+      average: total / relevantReviews.length,
+      count: relevantReviews.length
+    };
+  };
+
   const toggleWishlist = async (packageId: string) => {
     const newWishlist = wishlist.includes(packageId)
       ? wishlist.filter(id => id !== packageId)
@@ -162,6 +160,41 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     });
   };
 
+  const handleBooking = async () => {
+    if (!selectedPackage || !eventDate) {
+      alert('Please select a package and an event date.');
+      return;
+    }
+    try {
+      await addDoc(collection(db, 'bookings'), {
+        clientId: user.uid,
+        clientName: user.name,
+        packageId: selectedPackage.id,
+        packageName: selectedPackage.name,
+        customizations: selectedCustomizations.map(({ id, category, name, price }) => ({ id, category, name, price })),
+        totalPrice: getTotalPrice(),
+        eventDate: eventDate,
+        status: 'pending' as const,
+        createdAt: serverTimestamp(),
+        requirements: requirements,
+        guestCount: guestCount,
+      });
+
+      alert('Booking request submitted successfully!');
+      
+      setCurrentStep('packages');
+      setView('bookings'); // Switch to the bookings tab to show the new booking
+      setSelectedPackage(null);
+      setSelectedCustomizations([]);
+      setEventDate('');
+      setRequirements('');
+
+    } catch (error) {
+      console.error("Error creating booking: ", error);
+      alert('There was an error submitting your booking. Please try again.');
+    }
+  };
+
   const categoriesConfig = {
     venue: { name: 'Venue', icon: <Image className="w-5 h-5" /> },
     catering: { name: 'Catering', icon: <Users className="w-5 h-5" /> },
@@ -208,12 +241,84 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     return <div className="text-center p-12 text-gray-600">Loading...</div>;
   }
   
+  const ReviewModal = ({ isOpen, onClose, onSubmit, booking }: { 
+    isOpen: boolean; 
+    onClose: () => void; 
+    onSubmit: (rating: number, comment: string) => void;
+    booking: BookingRequest | null;
+  }) => {
+    const [rating, setRating] = useState(0);
+    const [comment, setComment] = useState('');
+
+    useEffect(() => {
+      if (!isOpen) {
+        // Reset state when modal is closed
+        setRating(0);
+        setComment('');
+      }
+    }, [isOpen]);
+
+    if (!isOpen || !booking) return null;
+
+    const handleSubmit = () => {
+      if (rating === 0) {
+        alert('Please select a star rating.');
+        return;
+      }
+      onSubmit(rating, comment);
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+          <div className="p-6 border-b flex justify-between items-center">
+            <h3 className="text-xl font-bold text-gray-900">Review {booking.packageName}</h3>
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="p-6">
+            <p className="text-gray-600 mb-4">How was your experience with this package?</p>
+            <div className="flex justify-center mb-6">
+              {[1, 2, 3, 4, 5].map((starValue) => (
+                <Star
+                  key={starValue}
+                  className={`w-10 h-10 cursor-pointer ${starValue <= rating ? 'text-yellow-400 fill-current' : 'text-gray-300'}`}
+                  onClick={() => setRating(starValue)}
+                />
+              ))}
+            </div>
+            <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-2">Comments (Optional)</label>
+            <textarea
+              id="comment"
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              rows={4}
+              placeholder="Share your thoughts about the package..."
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+            />
+          </div>
+          <div className="p-6 border-t flex justify-end gap-3">
+            <button onClick={onClose} className="px-5 py-2 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors">Cancel</button>
+            <button onClick={handleSubmit} className="px-5 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-medium hover:from-purple-700 hover:to-blue-700 transition-all duration-200">Submit Review</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const BookingStatusTracker = ({ booking }: { booking: BookingRequest }) => {
     const statuses: BookingRequest['status'][] = ['pending', 'confirmed', 'in-progress', 'completed'];
     const currentStatusIndex = statuses.indexOf(booking.status);
     const isRejected = booking.status === 'rejected';
     // isVendorAssigned is true if status is 'confirmed', 'in-progress', or 'completed'
     const isVendorAssigned = currentStatusIndex >= statuses.indexOf('confirmed'); 
+    const isCompleted = booking.status === 'completed';
+
+    // Check if the user has already reviewed this specific booking's package
+    const hasReviewed = reviews.some(
+      (review) => review.packageId === booking.packageId && review.clientId === user.uid
+    );
 
     return (
       <div className="bg-white rounded-2xl shadow-lg p-6 border hover:border-purple-200 transition-all flex flex-col">
@@ -288,8 +393,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
           )}
         </div>
         
-        {/* --- NEW CHAT BUTTON --- */}
-        <div className="mt-4 pt-4 border-t">
+        <div className="mt-4 pt-4 border-t flex flex-col gap-2">
           <button 
             onClick={() => {
               setSelectedBookingForChat(booking);
@@ -301,6 +405,29 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
             <MessageSquare className="w-4 h-4" />
             {isRejected ? 'Booking Rejected' : (isVendorAssigned ? 'Contact Vendor' : 'Vendor Not Assigned')}
           </button>
+
+          {/* NEW REVIEW BUTTON */}
+          {isCompleted && !isRejected && !hasReviewed && (
+            <button
+              onClick={() => {
+                setSelectedBookingForReview(booking);
+                setIsReviewOpen(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
+            >
+              <Star className="w-4 h-4" />
+              Leave a Review
+            </button>
+          )}
+          {isCompleted && !isRejected && hasReviewed && (
+            <button
+              disabled
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-gray-200 text-gray-600 rounded-lg cursor-not-allowed"
+            >
+              <Check className="w-4 h-4" />
+              Review Submitted
+            </button>
+          )}
         </div>
       </div>
     );
@@ -309,7 +436,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
   if (currentStep === 'packages') {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* --- NEW CHAT MODAL --- */}
+        {/* Chat Modal */}
         {isChatOpen && selectedBookingForChat && (
           <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg h-[70vh] flex flex-col">
@@ -335,6 +462,14 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
             </div>
           </div>
         )}
+
+        {/* Review Modal */}
+        <ReviewModal 
+          isOpen={isReviewOpen} 
+          onClose={() => setIsReviewOpen(false)} 
+          onSubmit={handleReviewSubmit} 
+          booking={selectedBookingForReview} 
+        />
         
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Welcome back, {user.name}!</h2>
@@ -389,6 +524,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
             <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-8">
               {filteredPackages.map((pkg) => {
                 const isWishlisted = wishlist.includes(pkg.id);
+                const rating = getPackageRating(pkg.id); // Get rating for the package
                 return (
                   <div key={pkg.id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 border hover:border-purple-200">
                     <div className="relative h-64">
@@ -408,6 +544,17 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
                     </div>
                     <div className="p-6">
                       <h3 className="text-xl font-bold text-gray-900 mb-2">{pkg.name}</h3>
+                      
+                      {/* Star Rating Display */}
+                      <div className="flex items-center mb-3">
+                        <div className="flex">
+                          {[...Array(5)].map((_, i) => (
+                            <Star key={i} className={`w-5 h-5 ${i < Math.round(rating.average) ? 'text-yellow-400 fill-current' : 'text-gray-300'}`} />
+                          ))}
+                        </div>
+                        <span className="ml-2 text-sm text-gray-500">({rating.count} reviews)</span>
+                      </div>
+
                       <p className="text-gray-600 mb-4">{pkg.description}</p>
                       <div className="space-y-2 mb-6">
                         {pkg.features.map((feature, index) => (
