@@ -1,14 +1,14 @@
+// src/App.tsx
+
 import React, { useState, useEffect } from 'react';
 import { User, Calendar, Package, Settings, LogOut, Menu, X, Bell } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-// Import additional Firestore functions for notifications
 import { doc, getDoc, collection, query, where, orderBy, onSnapshot, updateDoc } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
 import LoginPage from './components/LoginPage';
 import ClientDashboard from './components/ClientDashboard';
 import VendorDashboard from './components/VendorDashboard';
 import AdminDashboard from './components/AdminDashboard';
-// Import Notification type
 import { User as UserType, Notification } from './types';
 
 function App() {
@@ -16,16 +16,12 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-
-  // State to hold notifications for the current user
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   useEffect(() => {
-    // Listener for Firebase authentication state changes
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          // Fetch user document from Firestore based on UID
           const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
           if (userDoc.exists()) {
             const userData = userDoc.data();
@@ -33,7 +29,8 @@ function App() {
               uid: firebaseUser.uid,
               name: userData.name,
               email: userData.email,
-              role: userData.role
+              role: userData.role,
+              status: userData.status
             });
           } else {
             console.error('User document not found in Firestore');
@@ -46,64 +43,55 @@ function App() {
       } else {
         setCurrentUser(null);
       }
-      setLoading(false); // Set loading to false once auth state is determined
+      setLoading(false);
     });
-    return () => unsubscribeAuth(); // Clean up auth listener on component unmount
+    return () => unsubscribeAuth();
   }, []);
 
-  // Effect to listen for real-time notifications once the user is authenticated
   useEffect(() => {
     if (currentUser) {
-      // Create a Firestore query to get notifications for the current user, ordered by creation time
       const q = query(
         collection(db, 'notifications'),
         where('userId', '==', currentUser.uid),
-        orderBy('createdAt', 'desc') // Order notifications by creation date, newest first
+        orderBy('createdAt', 'desc')
       );
 
-      // Set up a real-time listener for the notifications query
       const unsubscribeNotifications = onSnapshot(q, (snapshot) => {
-        // Map the snapshot documents to Notification objects
         const notificationsData = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         } as Notification));
-        setNotifications(notificationsData); // Update the notifications state
+        setNotifications(notificationsData);
       }, (error) => {
         console.error("Error fetching real-time notifications:", error);
       });
 
-      // Clean up the notifications listener when the component unmounts or currentUser changes
       return () => unsubscribeNotifications();
     }
-  }, [currentUser]); // Re-run this effect when currentUser changes
+  }, [currentUser]);
 
-  // Function to mark a specific notification as read in Firestore
   const handleMarkAsRead = async (notificationId: string) => {
     try {
       const notificationRef = doc(db, 'notifications', notificationId);
-      await updateDoc(notificationRef, { isRead: true }); // Update the 'isRead' field to true
+      await updateDoc(notificationRef, { isRead: true });
     } catch (error) {
       console.error("Error marking notification as read:", error);
     }
   };
 
-  // Calculate the number of unread notifications
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
-  // Handles user logout
   const handleLogout = async () => {
     try {
-      await signOut(auth); // Sign out the current user
-      setCurrentUser(null); // Clear current user state
-      setMobileMenuOpen(false); // Close mobile menu
-      setIsNotificationsOpen(false); // Close notifications panel
+      await signOut(auth);
+      setCurrentUser(null);
+      setMobileMenuOpen(false);
+      setIsNotificationsOpen(false);
     } catch (error) {
       console.error('Error signing out:', error);
     }
   };
 
-  // Returns the appropriate icon based on the user's role
   const getUserIcon = () => {
     switch (currentUser?.role) {
       case 'client':
@@ -117,7 +105,6 @@ function App() {
     }
   };
 
-  // Renders the appropriate dashboard component based on the user's role
   const renderDashboard = () => {
     if (!currentUser) return null;
 
@@ -142,7 +129,6 @@ function App() {
     }
   };
 
-  // Display a loading spinner while authentication state is being determined
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-teal-50 flex items-center justify-center">
@@ -151,18 +137,16 @@ function App() {
             <Calendar className="w-8 h-8 text-white" />
           </div>
           <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto"></div>
-          <p className="text-gray-600 mt-4">Loading EventEase...</p>
+          <p className="text-gray-600 mt-4">Loading KAISRI...</p>
         </div>
       </div>
     );
   }
 
-  // If no user is logged in, display the login page
   if (!currentUser) {
-    return <LoginPage />;
+    return <LoginPage onLogin={setCurrentUser} />;
   }
 
-  // Main application layout once a user is logged in
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-teal-50">
       <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
@@ -173,7 +157,7 @@ function App() {
                 <Calendar className="w-5 h-5 text-white" />
               </div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                EventEase
+                KAISRI
               </h1>
             </div>
             <div className="hidden md:flex items-center space-x-4">
@@ -187,14 +171,12 @@ function App() {
                 </span>
               </div>
 
-              {/* Notification button and panel for desktop view */}
               <div className="relative">
                 <button
                   onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                   className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
                 >
                   <Bell className="w-5 h-5 text-gray-600" />
-                  {/* Display unread count indicator if there are unread notifications */}
                   {unreadCount > 0 && (
                     <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
                   )}
@@ -206,7 +188,6 @@ function App() {
                       <h4 className="font-semibold text-gray-800">Notifications</h4>
                     </div>
                     {notifications.length > 0 ? (
-                      // Render each notification item
                       notifications.map(n => (
                         <div
                           key={n.id}
@@ -215,7 +196,6 @@ function App() {
                         >
                           <p className="text-sm text-gray-700">{n.message}</p>
                           <p className="text-xs text-gray-400 mt-1">
-                            {/* Convert Firestore timestamp to a readable date string */}
                             {n.createdAt?.seconds ? new Date(n.createdAt.seconds * 1000).toLocaleString() : 'No date'}
                           </p>
                         </div>
@@ -255,45 +235,6 @@ function App() {
                   {currentUser.role}
                 </span>
               </div>
-              {/* Notification button and panel for mobile menu */}
-              <button
-                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                className="relative flex items-center space-x-2 w-full px-3 py-2 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-              >
-                <Bell className="w-4 h-4" />
-                <span className="text-sm font-medium">Notifications</span>
-                {/* Display unread count indicator if there are unread notifications */}
-                {unreadCount > 0 && (
-                  <span className="absolute top-2 right-2 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
-                )}
-              </button>
-              {isNotificationsOpen && (
-                <div className="mt-2 w-full bg-white rounded-xl shadow-lg border max-h-80 overflow-y-auto">
-                  <div className="p-4 border-b">
-                    <h4 className="font-semibold text-gray-800">Notifications</h4>
-                  </div>
-                  {notifications.length > 0 ? (
-                    // Render each notification item
-                    notifications.map(n => (
-                      <div
-                        key={n.id}
-                        onClick={() => handleMarkAsRead(n.id)}
-                        className={`p-4 border-b last:border-b-0 hover:bg-gray-50 cursor-pointer ${!n.isRead ? 'bg-blue-50' : ''}`}
-                      >
-                        <p className="text-sm text-gray-700">{n.message}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {/* Convert Firestore timestamp to a readable date string */}
-                          {n.createdAt?.seconds ? new Date(n.createdAt.seconds * 1000).toLocaleString() : 'No date'}
-                        </p>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-4 text-center text-gray-500">
-                      <p>You have no notifications.</p>
-                    </div>
-                  )}
-                </div>
-              )}
               <button
                 onClick={handleLogout}
                 className="flex items-center space-x-2 w-full px-3 py-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"

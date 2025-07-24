@@ -1,22 +1,29 @@
 // src/components/VendorInsights.tsx
 
 import React from 'react';
-import { User, Review, VendorTask } from '../types';
+import { User, Review, VendorTask, BookingRequest } from '../types';
 import { Star, CheckCircle, BarChart2 } from 'lucide-react';
 
 interface VendorInsightsProps {
   vendors: User[];
   reviews: Review[];
   tasks: VendorTask[];
+  bookings: BookingRequest[]; // 1. Accept the bookings prop
 }
 
-const VendorInsights: React.FC<VendorInsightsProps> = ({ vendors, reviews, tasks }) => {
+const VendorInsights: React.FC<VendorInsightsProps> = ({ vendors, reviews, tasks, bookings }) => {
   const getVendorStats = (vendorId: string) => {
-    // Find all reviews related to packages this vendor has worked on
+    // 2. --- CORRECTED LOGIC ---
     const vendorTasks = tasks.filter(task => task.vendorId === vendorId);
-    const packageIdsWorkedOn = [...new Set(vendorTasks.map(task => task.packageId))];
+    const bookingIdsWorkedOn = [...new Set(vendorTasks.map(task => task.bookingId))];
     
+    // Find the packages associated with the bookings the vendor worked on
+    const packageIdsWorkedOn = bookings
+      .filter(booking => bookingIdsWorkedOn.includes(booking.id))
+      .map(booking => booking.packageId);
+
     const relevantReviews = reviews.filter(review => packageIdsWorkedOn.includes(review.packageId));
+    // --- END OF CORRECTION ---
 
     const averageRating = relevantReviews.length > 0
       ? relevantReviews.reduce((acc, review) => acc + review.rating, 0) / relevantReviews.length

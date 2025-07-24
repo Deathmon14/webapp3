@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, where, doc, updateDoc, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-// Add Download icon from lucide-react
 import {
   Calendar, Users, Package, CheckCircle, Clock, AlertCircle, DollarSign, UserCheck, ArrowRight, Settings, XCircle, Search, Download
 } from 'lucide-react';
@@ -181,30 +180,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
     });
   }, [bookings, searchTerm, statusFilter]);
 
-  // NEW EXPORT TO CSV FUNCTION
   const handleExportCSV = () => {
     if (filteredBookings.length === 0) {
       alert("No data to export.");
       return;
     }
 
-    // Define CSV headers
     const headers = [
       'Booking ID', 'Client Name', 'Package Name', 'Event Date',
       'Status', 'Guest Count', 'Total Price', 'Customizations', 'Requirements'
     ];
 
-    // Convert booking data to CSV rows
     const rows = filteredBookings.map(booking => {
       const customizations = booking.customizations.map(c => c.name).join('; ');
-      // Escape commas and double quotes in requirements to prevent CSV corruption
-      const requirements = `"${(booking.requirements || '').replace(/"/g, '""')}"`; // Ensure requirements is a string before replace
+      const requirements = `"${(booking.requirements || '').replace(/"/g, '""')}"`;
 
       return [
         booking.id,
         booking.clientName,
         booking.packageName,
-        formatDate(booking.eventDate), // Format date for CSV
+        formatDate(booking.eventDate),
         booking.status,
         booking.guestCount,
         booking.totalPrice,
@@ -213,10 +208,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
       ].join(',');
     });
 
-    // Combine headers and rows
     const csvContent = [headers.join(','), ...rows].join('\n');
 
-    // Create a Blob and trigger download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -227,7 +220,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url); // Clean up the URL object
+    URL.revokeObjectURL(url);
   };
 
   if (loading) return <div className="p-8 text-center">Loading Admin Dashboard...</div>;
@@ -315,7 +308,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
               <div className="bg-white rounded-2xl shadow-lg p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xl font-bold text-gray-900">Recent Bookings</h3>
-                  {/* NEW EXPORT BUTTON */}
                   <button
                     onClick={handleExportCSV}
                     className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-100 rounded-lg hover:bg-purple-200 transition-colors"
@@ -473,8 +465,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
                 )}
               </div>
 
+              {/* VENDOR INSIGHTS PANEL */}
               <div className="bg-white rounded-2xl shadow-lg p-6">
-                <VendorInsights vendors={vendors} reviews={reviews} tasks={tasks} />
+                {/* Pass the 'bookings' array as a prop here */}
+                <VendorInsights
+                  vendors={vendors}
+                  reviews={reviews}
+                  tasks={tasks}
+                  bookings={bookings} // Added bookings prop
+                />
               </div>
             </div>
           </div>

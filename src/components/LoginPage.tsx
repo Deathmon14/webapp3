@@ -1,3 +1,5 @@
+// src/components/LoginPage.tsx
+
 import React, { useState } from 'react';
 import { Calendar, Users, Briefcase, ArrowRight, Eye, EyeOff, Mail, Lock, User as UserIcon } from 'lucide-react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
@@ -20,37 +22,31 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [signupSuccess, setSignupSuccess] = useState(false); // New state for signup success message
+  const [signupSuccess, setSignupSuccess] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
     setError('');
-    setSignupSuccess(false); // Clear success message on input change
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setSignupSuccess(false); // Ensure success message is cleared on login attempt
+    setSignupSuccess(false);
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
-
-      // Fetch user data from Firestore
+      
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-
+      
       if (userDoc.exists()) {
         const userData = userDoc.data();
-
-        // Check for pending vendor accounts
+        
         if (userData.status === 'pending') {
           setError('Your account is pending approval from an administrator. Please check back later.');
-          await auth.signOut(); // Sign out the user if account is pending
+          await auth.signOut();
           setLoading(false);
           return;
         }
@@ -60,7 +56,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           name: userData.name,
           email: userData.email,
           role: userData.role,
-          status: userData.status // Include status in user object
+          status: userData.status
         };
         onLogin(userObject);
       } else {
@@ -78,7 +74,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setSignupSuccess(false); // Ensure success message is cleared on signup attempt
+    setSignupSuccess(false);
 
     if (!formData.name.trim()) {
       setError('Please enter your full name.');
@@ -87,38 +83,34 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     }
 
     try {
-      // Create user in Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
-
+      
       const isVendor = formData.role === 'vendor';
 
-      // Create user document in Firestore
       const userData = {
         uid: user.uid,
         name: formData.name.trim(),
         email: formData.email,
         role: formData.role,
-        status: isVendor ? 'pending' : 'active', // Set status to 'pending' for vendors
+        status: isVendor ? 'pending' : 'active',
         createdAt: new Date().toISOString()
       };
 
       await setDoc(doc(db, 'users', user.uid), userData);
 
       if (isVendor) {
-        // For vendors, sign out and show approval message
         await auth.signOut();
         setSignupSuccess(true);
-        setIsLogin(true); // Switch to login view
-        setFormData({ name: '', email: '', password: '', role: 'client' }); // Clear form data
+        setIsLogin(true);
+        setFormData({ name: '', email: '', password: '', role: 'client' });
       } else {
-        // For clients, log them in immediately
         const userObject: User = {
           uid: user.uid,
           name: userData.name,
           email: userData.email,
           role: userData.role,
-          status: 'active' // Clients are active immediately
+          status: 'active'
         };
         onLogin(userObject);
       }
@@ -130,7 +122,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       setLoading(false);
     }
   };
-
+  
   const roleInfo = {
     client: {
       title: 'Client Account',
@@ -149,28 +141,32 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-teal-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-3 mb-6">
             <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center">
               <Calendar className="w-7 h-7 text-white" />
             </div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-              EventEase
+              KAISRI
             </h1>
           </div>
           <p className="text-xl text-gray-600">
             {isLogin ? 'Welcome back!' : 'Create your account'}
           </p>
           <p className="text-gray-500 mt-2">
-            {isLogin ? 'Sign in to manage your events' : 'Join our event management platform'}
+            Book it. Forget it. Flaunt it.
           </p>
         </div>
 
-        {/* Auth Form */}
         <div className="bg-white rounded-2xl shadow-xl p-8">
+          {signupSuccess && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
+              <p className="text-green-800 text-sm font-medium">
+                Vendor account created! An administrator will review your request. You can log in once approved.
+              </p>
+            </div>
+          )}
           <form onSubmit={isLogin ? handleLogin : handleSignup} className="space-y-6">
-            {/* Name Field (Signup only) */}
             {!isLogin && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -190,8 +186,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 </div>
               </div>
             )}
-
-            {/* Email Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Email Address *
@@ -209,8 +203,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 />
               </div>
             </div>
-
-            {/* Password Field */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Password *
@@ -239,8 +231,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 <p className="text-xs text-gray-500 mt-1">Password must be at least 6 characters</p>
               )}
             </div>
-
-            {/* Role Selection (Signup only) */}
             {!isLogin && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -276,24 +266,11 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 </div>
               </div>
             )}
-
-            {/* Error Message */}
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4">
                 <p className="text-red-700 text-sm">{error}</p>
               </div>
             )}
-
-            {/* Signup Success Message */}
-            {signupSuccess && (
-              <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-                <p className="text-green-700 text-sm">
-                  Account created successfully! Your vendor account is pending administrator approval. Please sign in after approval.
-                </p>
-              </div>
-            )}
-
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
@@ -310,7 +287,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             </button>
           </form>
 
-          {/* Toggle Auth Mode */}
           <div className="mt-6 text-center">
             <p className="text-gray-600">
               {isLogin ? "Don't have an account?" : 'Already have an account?'}
@@ -318,7 +294,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setError('');
-                  setSignupSuccess(false); // Clear success message on mode toggle
                   setFormData({ name: '', email: '', password: '', role: 'client' });
                 }}
                 className="ml-2 text-purple-600 hover:text-purple-700 font-medium"
@@ -326,40 +301,6 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 {isLogin ? 'Sign up' : 'Sign in'}
               </button>
             </p>
-          </div>
-
-          {/* Demo Note */}
-          {isLogin && (
-            <div className="mt-6 p-4 bg-gray-50 rounded-xl">
-              <p className="text-sm text-gray-600">
-                <strong>Demo:</strong> Create a new account or use existing credentials to test the platform.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Features Preview */}
-        <div className="mt-12 grid grid-cols-3 gap-6 text-center">
-          <div className="space-y-2">
-            <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center mx-auto">
-              <Calendar className="w-5 h-5 text-purple-600" />
-            </div>
-            <h4 className="font-semibold text-gray-900 text-sm">Smart Planning</h4>
-            <p className="text-xs text-gray-600">Intuitive event planning</p>
-          </div>
-          <div className="space-y-2">
-            <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center mx-auto">
-              <Users className="w-5 h-5 text-teal-600" />
-            </div>
-            <h4 className="font-semibold text-gray-900 text-sm">Team Coordination</h4>
-            <p className="text-xs text-gray-600">Seamless collaboration</p>
-          </div>
-          <div className="space-y-2">
-            <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center mx-auto">
-              <Briefcase className="w-5 h-5 text-orange-600" />
-            </div>
-            <h4 className="font-semibold text-gray-900 text-sm">Progress Tracking</h4>
-            <p className="text-xs text-gray-600">Real-time updates</p>
           </div>
         </div>
       </div>
