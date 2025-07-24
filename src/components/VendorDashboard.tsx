@@ -72,23 +72,36 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
     }
   };
 
+  // --- UPDATED DATE FORMATTING FUNCTIONS ---
   const formatDate = (dateString: any) => {
-    // Handles both string dates from old mock data and Firebase Timestamps
     const date = dateString?.seconds ? new Date(dateString.seconds * 1000) : new Date(dateString);
+    if (isNaN(date.getTime())) return "Invalid Date";
     return date.toLocaleDateString('en-US', {
-      weekday: 'long',
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
   };
 
-  const getDaysUntil = (dateString: any) => {
+  const getRelativeDateText = (dateString: any) => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const eventDate = dateString?.seconds ? new Date(dateString.seconds * 1000) : new Date(dateString);
+    eventDate.setHours(0, 0, 0, 0);
+
     const diffTime = eventDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+
+    if (diffDays < 0) {
+      return <span className="ml-2 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">Overdue</span>;
+    }
+    if (diffDays === 0) {
+      return <span className="ml-2 px-2 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium">Due Today</span>;
+    }
+    if (diffDays <= 7) {
+      return <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">Due in {diffDays} days</span>;
+    }
+    return null; // No indicator if it's more than a week away
   };
 
   const stats = {
@@ -127,7 +140,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
             </div>
           </div>
         </div>
-        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+        <div className="bg-white rounded-xl p-6 shadow-lg border-gray-100">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Assigned</p>
@@ -168,22 +181,18 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
           <h3 className="text-xl font-bold text-gray-900 mb-6">Your Tasks</h3>
           <div className="space-y-4">
             {tasks.map((task) => {
-              const daysUntil = getDaysUntil(task.eventDate);
-              const isUrgent = daysUntil <= 7 && task.status !== 'completed';
+              const relativeDate = getRelativeDateText(task.eventDate);
               return (
                 <div key={task.id} onClick={() => setSelectedTask(task)} className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md ${selectedTask?.id === task.id ? 'border-purple-300 bg-purple-50' : 'border-gray-200 hover:border-purple-200'}`}>
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
                       <h4 className="font-semibold text-gray-900 mb-1">{task.title}</h4>
                       <p className="text-sm text-gray-600 mb-2">{task.description}</p>
+                      {/* --- UPDATED DATE DISPLAY --- */}
                       <div className="flex items-center text-sm text-gray-500">
                         <Calendar className="w-4 h-4 mr-1" />
                         <span>{formatDate(task.eventDate)}</span>
-                        {isUrgent && (
-                          <span className="ml-2 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
-                            Due in {daysUntil} days
-                          </span>
-                        )}
+                        {task.status !== 'completed' && relativeDate}
                       </div>
                     </div>
                     <div className="ml-4">{getStatusIcon(task.status)}</div>
