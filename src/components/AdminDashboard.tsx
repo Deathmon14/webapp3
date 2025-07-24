@@ -1,3 +1,5 @@
+// src/components/AdminDashboard.tsx
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, where, doc, updateDoc, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -10,7 +12,7 @@ import UserManagement from './UserManagement';
 import ChatComponent from './ChatComponent';
 import VendorInsights from './VendorInsights';
 import ActivityLog from './ActivityLog';
-import AnalyticsDashboard from './AnalyticsDashboard'; // 1. Import the new component
+import AnalyticsDashboard from './AnalyticsDashboard'; 
 
 interface AdminDashboardProps {
   user: User;
@@ -21,10 +23,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   const [vendors, setVendors] = useState<User[]>([]);
   const [tasks, setTasks] = useState<VendorTask[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [packages, setPackages] = useState<EventPackage[]>([]); // Add state for packages
+  const [packages, setPackages] = useState<EventPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<BookingRequest | null>(null);
-  const [activeTab, setActiveTab] = useState<'bookings' | 'users' | 'catalog' | 'analytics'>('bookings'); // 2. Add 'analytics' to activeTab state
+  const [activeTab, setActiveTab] = useState<'bookings' | 'users' | 'catalog' | 'analytics'>('bookings');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | BookingRequest['status']>('all');
 
@@ -51,7 +53,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
       setReviews(reviewsData);
     });
 
-    // NEW: Listener for packages data
     const unsubPackages = onSnapshot(collection(db, 'packages'), (snapshot) => {
         const packagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EventPackage));
         setPackages(packagesData);
@@ -62,7 +63,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
       unsubVendors();
       unsubTasks();
       unsubReviews();
-      unsubPackages(); // Cleanup packages listener
+      unsubPackages();
     };
   }, []);
 
@@ -95,40 +96,40 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
     activeVendors: vendors.length
   };
 
-  const handleExportCSV = () => {
-    if (filteredBookings.length === 0) {
-      alert("No data to export.");
-      return;
-    }
-    const headers = ['Booking ID', 'Client Name', 'Package Name', 'Event Date', 'Status', 'Guest Count', 'Total Price', 'Customizations', 'Requirements'];
-    const rows = filteredBookings.map(booking => {
-      const customizations = booking.customizations.map(c => c.name).join('; ');
-      const requirements = `"${(booking.requirements || '').replace(/"/g, '""')}"`;
-      const eventDateFormatted = formatDate(booking.eventDate);
-      return [
-        booking.id,
-        booking.clientName,
-        booking.packageName,
-        eventDateFormatted,
-        booking.status,
-        booking.guestCount,
-        booking.totalPrice,
-        customizations,
-        requirements
-      ].join(',');
-    });
-    const csvContent = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `bookings-report-${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+    const handleExportCSV = () => {
+        if (filteredBookings.length === 0) {
+            alert("No data to export.");
+            return;
+        }
+        const headers = ['Booking ID', 'Client Name', 'Package Name', 'Event Date', 'Status', 'Guest Count', 'Total Price', 'Customizations', 'Requirements'];
+        const rows = filteredBookings.map(booking => {
+            const customizations = booking.customizations.map(c => c.name).join('; ');
+            const requirements = `"${(booking.requirements || '').replace(/"/g, '""')}"`;
+            const eventDateFormatted = formatDate(booking.eventDate);
+            return [
+                booking.id,
+                booking.clientName,
+                booking.packageName,
+                eventDateFormatted,
+                booking.status,
+                booking.guestCount,
+                booking.totalPrice,
+                customizations,
+                requirements
+            ].join(',');
+        });
+        const csvContent = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `bookings-report-${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
 
   const updateBookingStatus = async (bookingId: string, newStatus: BookingRequest['status']) => {
     if (!bookingId) return;
@@ -152,6 +153,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
     if (!vendorId || !booking) return;
     const vendor = vendors.find(v => v.uid === vendorId);
     if (!vendor) return;
+
     try {
       const batch = writeBatch(db);
       const newTaskRef = doc(collection(db, 'tasks'));
@@ -225,7 +227,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
           >
             Bookings
           </button>
-          {/* 3. Add the new Analytics tab button */}
           <button
             onClick={() => setActiveTab('analytics')}
             className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'analytics' ? 'border-purple-500 text-purple-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
@@ -307,16 +308,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
                       <label className="block text-sm font-medium text-gray-700 mb-3">Vendor Assignments</label>
                       <div className="space-y-3">
                         {getRequiredCategories(selectedBooking).length > 0 ? getRequiredCategories(selectedBooking).map((category) => {
-                          const assignedTask = tasks.find(t => t.bookingId === selectedBooking.id && t.category === category);
+                          const assignedTasks = tasks.filter(t => t.bookingId === selectedBooking.id && t.category === category);
                           return (
                             <div key={category} className="border border-gray-200 rounded-xl p-4">
-                              <div className="flex items-center justify-between mb-2"><span className="font-medium text-gray-900 capitalize">{category}</span>{assignedTask && <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Assigned</span>}</div>
-                              {assignedTask ? (<p className="text-sm text-gray-600">{assignedTask.vendorName}</p>) : (
-                                <select onChange={(e) => assignVendor(selectedBooking, e.target.value, category)} className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-purple-500 focus:border-purple-500" defaultValue="">
-                                  <option value="">Select vendor...</option>
-                                  {vendors.map((vendor) => (<option key={vendor.uid} value={vendor.uid}>{vendor.name}</option>))}
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="font-medium text-gray-900 capitalize">{category}</span>
+                                    {assignedTasks.length > 0 && <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">{assignedTasks.length} Assigned</span>}
+                                </div>
+                                {assignedTasks.map(task => (
+                                    <p key={task.id} className="text-sm text-gray-600 mb-1">{task.vendorName}</p>
+                                ))}
+                                <select 
+                                    onChange={(e) => {
+                                        assignVendor(selectedBooking, e.target.value, category);
+                                        e.target.value = "";
+                                    }} 
+                                    className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-purple-500 focus:border-purple-500" 
+                                    defaultValue=""
+                                >
+                                    <option value="">Assign a new vendor...</option>
+                                    {vendors.map((vendor) => (<option key={vendor.uid} value={vendor.uid}>{vendor.name}</option>))}
                                 </select>
-                              )}
                             </div>
                           );
                         }) : <p className="text-sm text-gray-500">No specific vendor services required.</p>}
@@ -341,7 +353,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
         </>
       )}
 
-      {/* 4. Render the AnalyticsDashboard when the tab is active */}
       {activeTab === 'analytics' && (
         <AnalyticsDashboard
           bookings={bookings}
@@ -351,7 +362,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
         />
       )}
 
-      {activeTab === 'users' && <UserManagement user={user} />}
+      {activeTab === 'users' && <UserManagement />}
       {activeTab === 'catalog' && <CatalogManager />}
     </div>
   );
