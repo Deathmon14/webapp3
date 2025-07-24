@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, serverTimestamp, doc, getDoc, setDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+// Make sure to import 'query' and 'where' from firebase/firestore
+import { collection, getDocs, addDoc, serverTimestamp, doc, getDoc, setDoc, query, where, orderBy, onSnapshot, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Package, Star, ArrowRight, Check, Image, Users, Heart, Search, Eye, X, Calendar, Briefcase, XCircle, MessageSquare } from 'lucide-react';
 import { User, EventPackage, CustomizationOption, BookingRequest, Review } from '../types';
+import ChatModal from './ChatModal'; // Import the new ChatModal
 
 interface ClientDashboardProps {
   user: User;
@@ -15,6 +17,9 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [bookings, setBookings] = useState<BookingRequest[]>([]);
+  // --- NEW STATE FOR UNAVAILABLE DATES ---
+  const [unavailableDates, setUnavailableDates] = useState<string[]>([]);
+
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [selectedBookingForReview, setSelectedBookingForReview] = useState<BookingRequest | null>(null);
@@ -30,6 +35,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
   const [eventDate, setEventDate] = useState('');
   const [requirements, setRequirements] = useState('');
   const [currentStep, setCurrentStep] = useState<'packages' | 'customize' | 'book'>('packages');
+
 
   useEffect(() => {
     // --- CORRECTED AND SIMPLIFIED DATA FETCHING LOGIC ---
@@ -55,10 +61,9 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     // First, fetch all the data that doesn't need to be real-time
     fetchStaticData();
 
-    // Then, set up the real-time listener for bookings
-    const bookingsQuery = query(collection(db, 'bookings'), where('clientId', '==', user.uid), orderBy('createdAt', 'desc'));
-    
-    const unsubscribe = onSnapshot(bookingsQuery, (snapshot) => {
+    // Listener for current user's bookings
+    const userBookingsQuery = query(collection(db, 'bookings'), where('clientId', '==', user.uid), orderBy('createdAt', 'desc'));
+    const unsubscribeUserBookings = onSnapshot(userBookingsQuery, (snapshot) => {
       setBookings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BookingRequest));
       setLoading(false); // The component is ready to be displayed
     }, (error) => {
@@ -66,7 +71,25 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
       setLoading(false); // Stop loading even if there's an error
     });
 
-    return () => unsubscribe(); // Cleanup the real-time listener
+    // --- NEW: Listener for all confirmed/in-progress bookings to block dates ---
+    const allBookingsQuery = query(
+      collection(db, 'bookings'), 
+      where('status', 'in', ['confirmed', 'in-progress'])
+    );
+
+    const unsubscribeAllBookings = onSnapshot(allBookingsQuery, (snapshot) => {
+      // Extract only the eventDate strings
+      const dates = snapshot.docs.map(doc => doc.data().eventDate as string);
+      setUnavailableDates(dates);
+    }, (error) => {
+      console.error("Error fetching unavailable dates:", error);
+    });
+
+    // Cleanup both listeners
+    return () => {
+      unsubscribeUserBookings(); 
+      unsubscribeAllBookings();
+    };
   }, [user.uid]);
 
   const handleReviewSubmit = async (rating: number, comment: string) => {
@@ -165,8 +188,19 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
       alert('Please select a package and an event date.');
       return;
     }
+    // Perform an additional check for unavailable dates right before booking
+    if (unavailableDates.includes(eventDate)) {
+        alert("The selected date is no longer available. Please choose another date.");
+        return;
+    }
+
     try {
-      await addDoc(collection(db, 'bookings'), {
+      // Use a batch write to ensure both operations succeed or fail together
+      const batch = writeBatch(db);
+
+      // 1. Create the new booking document
+      const newBookingRef = doc(collection(db, 'bookings'));
+      batch.set(newBookingRef, {
         clientId: user.uid,
         clientName: user.name,
         packageId: selectedPackage.id,
@@ -179,6 +213,20 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
         requirements: requirements,
         guestCount: guestCount,
       });
+
+      // 2. Create the activity log entry
+      const logRef = doc(collection(db, 'activity_logs'));
+      batch.set(logRef, {
+        message: `${user.name} submitted a new booking request for "${selectedPackage.name}".`,
+        timestamp: serverTimestamp(),
+        meta: {
+          clientId: user.uid,
+          bookingId: newBookingRef.id
+        }
+      });
+
+      // Commit the batch
+      await batch.commit();
 
       alert('Booking request submitted successfully!');
       
@@ -203,23 +251,23 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     photography: { name: 'Photography', icon: <Image className="w-5 h-5" /> }
   };
 
-  const DatePicker = ({ selectedDate, onDateChange }: { selectedDate: string, onDateChange: (date: string) => void }) => {
+  // --- NEW ADVANCED DATEPICKER COMPONENT ---
+  const DatePicker = ({ selectedDate, onDateChange, disabledDates }: { 
+    selectedDate: string, 
+    onDateChange: (date: string) => void,
+    disabledDates: string[]
+  }) => {
     const today = new Date();
-    const todayFormatted = today.getFullYear() + '-' + 
-                           String(today.getMonth() + 1).padStart(2, '0') + '-' + 
-                           String(today.getDate()).padStart(2, '0');
+    today.setDate(today.getDate() + 1); // Events must be booked at least one day in advance
+    const minDate = today.toISOString().split('T')[0];
 
     const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      const selected = new Date(e.target.value);
-      const todayWithoutTime = new Date();
-      todayWithoutTime.setHours(0, 0, 0, 0);
-
-      if (selected >= todayWithoutTime) {
-        onDateChange(e.target.value);
-      } else {
-        alert("You cannot select a past date.");
-        onDateChange('');
+      const newDate = e.target.value;
+      if (disabledDates.includes(newDate)) {
+        alert("This date is already booked. Please choose another date.");
+        return;
       }
+      onDateChange(newDate);
     };
     
     return (
@@ -229,14 +277,15 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
           type="date" 
           value={selectedDate} 
           onChange={handleDateChange}
-          min={todayFormatted}
+          min={minDate}
           className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           required
         />
+        <p className="text-xs text-gray-500 mt-1">Note: Dates already booked are not available.</p>
       </div>
     );
   };
-
+  
   if (loading) {
     return <div className="text-center p-12 text-gray-600">Loading...</div>;
   }
@@ -399,11 +448,11 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
               setSelectedBookingForChat(booking);
               setIsChatOpen(true);
             }}
-            disabled={!isVendorAssigned || isRejected} // Disable if no vendor assigned OR if rejected
+            disabled={isRejected} // Disable if rejected
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             <MessageSquare className="w-4 h-4" />
-            {isRejected ? 'Booking Rejected' : (isVendorAssigned ? 'Contact Organiser' : 'Vendor Not Assigned')}
+            {isRejected ? 'Booking Rejected' : 'Contact Admin'}
           </button>
 
           {/* NEW REVIEW BUTTON */}
@@ -436,31 +485,14 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
   if (currentStep === 'packages') {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Chat Modal */}
+        {/* RENDER THE CHAT MODAL */}
         {isChatOpen && selectedBookingForChat && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg h-[70vh] flex flex-col">
-              <div className="p-4 border-b">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-bold text-gray-900">Chat for "{selectedBookingForChat.packageName}"</h3>
-                  <button onClick={() => setIsChatOpen(false)} className="p-2 hover:bg-gray-100 rounded-full">
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-              <div className="flex-grow p-4 text-center text-gray-500 flex items-center justify-center">
-                <p>Real-time chat functionality coming soon!</p>
-              </div>
-              <div className="p-4 border-t bg-gray-50">
-                <div className="relative">
-                  <input type="text" placeholder="Type your message..." className="w-full pl-4 pr-12 py-2 border rounded-full" disabled />
-                  <button className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-blue-500 text-white rounded-full" disabled>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          <ChatModal 
+            isOpen={isChatOpen}
+            onClose={() => setIsChatOpen(false)}
+            booking={selectedBookingForChat}
+            currentUser={user}
+          />
         )}
 
         {/* Review Modal */}
@@ -680,7 +712,8 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
               <label className="block text-sm font-medium text-gray-700 mb-2">Expected Guests</label>
               <input type="number" value={guestCount} onChange={(e) => setGuestCount(Number(e.target.value))} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent" min="1" />
             </div>
-            <DatePicker selectedDate={eventDate} onDateChange={setEventDate} />
+            {/* UPDATED DATEPICKER CALL */}
+            <DatePicker selectedDate={eventDate} onDateChange={setEventDate} disabledDates={unavailableDates} />
           </div>
         </div>
         <div className="space-y-8">
@@ -794,7 +827,8 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
         <div className="bg-white rounded-2xl p-6 shadow-lg">
           <h3 className="text-xl font-bold text-gray-900 mb-6">Additional Information</h3>
           <div className="space-y-6">
-            <DatePicker selectedDate={eventDate} onDateChange={setEventDate} />
+            {/* UPDATED DATEPICKER CALL */}
+            <DatePicker selectedDate={eventDate} onDateChange={setEventDate} disabledDates={unavailableDates} />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Special Requirements</label>
               <textarea value={requirements} onChange={(e) => setRequirements(e.target.value)} placeholder="Any dietary needs, accessibility, etc..." className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent h-32 resize-none" />
@@ -808,7 +842,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
                 <li>• Payment options will be provided upon confirmation</li>
               </ul>
             </div>
-            <button onClick={handleBooking} disabled={!eventDate} className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-4 rounded-xl font-medium hover:from-purple-700 hover:to-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+            <button onClick={handleBooking} disabled={!eventDate || unavailableDates.includes(eventDate)} className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-4 rounded-xl font-medium hover:from-purple-700 hover:to-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
               Submit Booking Request
             </button>
           </div>

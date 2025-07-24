@@ -20,6 +20,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [signupSuccess, setSignupSuccess] = useState(false); // New state for signup success message
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({
@@ -27,12 +28,14 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       [e.target.name]: e.target.value
     }));
     setError('');
+    setSignupSuccess(false); // Clear success message on input change
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSignupSuccess(false); // Ensure success message is cleared on login attempt
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
@@ -40,15 +43,24 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
       // Fetch user data from Firestore
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      
+
       if (userDoc.exists()) {
         const userData = userDoc.data();
+
+        // Check for pending vendor accounts
+        if (userData.status === 'pending') {
+          setError('Your account is pending approval from an administrator. Please check back later.');
+          await auth.signOut(); // Sign out the user if account is pending
+          setLoading(false);
+          return;
+        }
+
         const userObject: User = {
-          id: user.uid,
           uid: user.uid,
           name: userData.name,
           email: userData.email,
-          role: userData.role
+          role: userData.role,
+          status: userData.status // Include status in user object
         };
         onLogin(userObject);
       } else {
@@ -66,6 +78,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSignupSuccess(false); // Ensure success message is cleared on signup attempt
 
     if (!formData.name.trim()) {
       setError('Please enter your full name.');
@@ -78,27 +91,38 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
 
+      const isVendor = formData.role === 'vendor';
+
       // Create user document in Firestore
       const userData = {
         uid: user.uid,
         name: formData.name.trim(),
         email: formData.email,
         role: formData.role,
+        status: isVendor ? 'pending' : 'active', // Set status to 'pending' for vendors
         createdAt: new Date().toISOString()
       };
 
       await setDoc(doc(db, 'users', user.uid), userData);
 
-      // Create user object for the app
-      const userObject: User = {
-        id: user.uid,
-        uid: user.uid,
-        name: userData.name,
-        email: userData.email,
-        role: userData.role
-      };
+      if (isVendor) {
+        // For vendors, sign out and show approval message
+        await auth.signOut();
+        setSignupSuccess(true);
+        setIsLogin(true); // Switch to login view
+        setFormData({ name: '', email: '', password: '', role: 'client' }); // Clear form data
+      } else {
+        // For clients, log them in immediately
+        const userObject: User = {
+          uid: user.uid,
+          name: userData.name,
+          email: userData.email,
+          role: userData.role,
+          status: 'active' // Clients are active immediately
+        };
+        onLogin(userObject);
+      }
 
-      onLogin(userObject);
     } catch (error: any) {
       console.error('Signup error:', error);
       setError(error.message || 'Failed to create account. Please try again.');
@@ -260,6 +284,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               </div>
             )}
 
+            {/* Signup Success Message */}
+            {signupSuccess && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                <p className="text-green-700 text-sm">
+                  Account created successfully! Your vendor account is pending administrator approval. Please sign in after approval.
+                </p>
+              </div>
+            )}
+
             {/* Submit Button */}
             <button
               type="submit"
@@ -285,6 +318,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setError('');
+                  setSignupSuccess(false); // Clear success message on mode toggle
                   setFormData({ name: '', email: '', password: '', role: 'client' });
                 }}
                 className="ml-2 text-purple-600 hover:text-purple-700 font-medium"

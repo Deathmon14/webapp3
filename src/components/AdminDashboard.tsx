@@ -1,58 +1,63 @@
-import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import React, { useState, useEffect, useMemo } from 'react';
+import { collection, onSnapshot, query, where, doc, updateDoc, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+// Add Download icon from lucide-react
 import {
-  Calendar, Users, Package, CheckCircle, Clock, AlertCircle, DollarSign, UserCheck, ArrowRight, Settings, XCircle, X
+  Calendar, Users, Package, CheckCircle, Clock, AlertCircle, DollarSign, UserCheck, ArrowRight, Settings, XCircle, Search, Download
 } from 'lucide-react';
-import { User, BookingRequest, VendorTask } from '../types';
+import { User, BookingRequest, VendorTask, Review } from '../types';
 import CatalogManager from './CatalogManager';
-import UserManagement from './UserManagement'; // Import the new component
+import UserManagement from './UserManagement';
+import ChatComponent from './ChatComponent';
+import VendorInsights from './VendorInsights';
+import ActivityLog from './ActivityLog'; // Import the new component
 
 interface AdminDashboardProps {
-  user: User; // Assuming 'user' prop is still relevant for potential access control
+  user: User;
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   const [bookings, setBookings] = useState<BookingRequest[]>([]);
-  // 'allUsers' state is now primarily managed by UserManagement, but 'vendors' is still needed here for assignments
-  const [vendors, setVendors] = useState<User[]>([]); 
+  const [vendors, setVendors] = useState<User[]>([]);
   const [tasks, setTasks] = useState<VendorTask[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<BookingRequest | null>(null);
-  
-  // State for tabs
   const [activeTab, setActiveTab] = useState<'bookings' | 'users' | 'catalog'>('bookings');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | BookingRequest['status']>('all');
 
   useEffect(() => {
-    // Fetch bookings for the 'bookings' tab
     const unsubBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
-      const bookingsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BookingRequest));
-      setBookings(bookingsData.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
-      // Only set loading to false after initial bookings fetch, as it's the default tab
-      setLoading(false); 
-    });
+        const bookingsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BookingRequest));
+        setBookings(bookingsData.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+        setLoading(false);
+      });
 
-    // Fetch vendors specifically for assignment in the 'bookings' tab
-    const vendorQuery = query(collection(db, 'users'), where('role', '==', 'vendor'));
-    const unsubVendors = onSnapshot(vendorQuery, (snapshot) => {
-      const vendorsData = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as unknown as User));
-      setVendors(vendorsData);
-    });
-    
-    // Fetch tasks for the 'bookings' tab (to show assigned vendors)
-    const unsubTasks = onSnapshot(collection(db, 'tasks'), (snapshot) => {
-        const tasksData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VendorTask));
-        setTasks(tasksData);
+      const vendorQuery = query(collection(db, 'users'), where('role', '==', 'vendor'));
+      const unsubVendors = onSnapshot(vendorQuery, (snapshot) => {
+        const vendorsData = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as unknown as User));
+        setVendors(vendorsData);
+      });
+
+      const unsubTasks = onSnapshot(collection(db, 'tasks'), (snapshot) => {
+          const tasksData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VendorTask));
+          setTasks(tasksData);
+      });
+
+    const unsubReviews = onSnapshot(collection(db, 'reviews'), (snapshot) => {
+      const reviewsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Review));
+      setReviews(reviewsData);
     });
 
     return () => {
       unsubBookings();
       unsubVendors();
       unsubTasks();
+      unsubReviews();
     };
   }, []);
 
-  // Effect to keep selectedBooking updated if the underlying bookings data changes
   useEffect(() => {
     if (selectedBooking?.id) {
       const updatedBooking = bookings.find(b => b.id === selectedBooking.id);
@@ -64,7 +69,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   const updateBookingStatus = async (bookingId: string, newStatus: BookingRequest['status']) => {
     if (!bookingId) return;
     const bookingDocRef = doc(db, 'bookings', bookingId);
-    
+
     try {
       await updateDoc(bookingDocRef, { status: newStatus });
 
@@ -76,7 +81,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
           message: message,
           isRead: false,
           createdAt: serverTimestamp(),
-          link: `/booking/${bookingId}` // Consider your actual client booking detail route
+          link: `/booking/${bookingId}`
         });
       }
     } catch (error) {
@@ -84,25 +89,43 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
       alert("Failed to update status. Please try again.");
     }
   };
-  
+
   const assignVendor = async (booking: BookingRequest, vendorId: string, category: string) => {
-      if (!vendorId || !booking) return;
-      const vendor = vendors.find(v => v.uid === vendorId);
-      if (!vendor) return; // Ensure vendor exists
-      try {
-        await addDoc(collection(db, 'tasks'), {
-          bookingId: booking.id, vendorId: vendor.uid, vendorName: vendor.name, category,
-          title: `${category.charAt(0).toUpperCase() + category.slice(1)} for ${booking.packageName}`,
-          description: `Handle ${category} for ${booking.clientName}'s event.`, status: 'assigned', eventDate: booking.eventDate,
-          clientRequirements: booking.requirements || 'No specific requirements provided.', createdAt: serverTimestamp(),
-        });
-        alert(`${vendor.name} has been assigned.`);
-      } catch (error) {
-        console.error("Error assigning vendor:", error);
-        alert("Failed to assign vendor. Please try again.");
-      }
-    };
-  
+    if (!vendorId || !booking) return;
+    const vendor = vendors.find(v => v.uid === vendorId);
+    if (!vendor) return;
+
+    try {
+      const batch = writeBatch(db);
+
+      const newTaskRef = doc(collection(db, 'tasks'));
+      batch.set(newTaskRef, {
+        bookingId: booking.id, vendorId: vendor.uid, vendorName: vendor.name, category,
+        title: `${category.charAt(0).toUpperCase() + category.slice(1)} for ${booking.packageName}`,
+        description: `Handle ${category} for ${booking.clientName}'s event.`, status: 'assigned', eventDate: booking.eventDate,
+        clientRequirements: booking.requirements || 'No specific requirements provided.', createdAt: serverTimestamp(),
+      });
+
+      const logRef = doc(collection(db, 'activity_logs'));
+      batch.set(logRef, {
+        message: `Admin assigned ${vendor.name} to the ${category} task for "${booking.packageName}".`,
+        timestamp: serverTimestamp(),
+        meta: {
+          bookingId: booking.id,
+          vendorName: vendor.name,
+          clientName: booking.clientName
+        }
+      });
+
+      await batch.commit();
+      alert(`${vendor.name} has been assigned.`);
+
+    } catch (error) {
+      console.error("Error assigning vendor:", error);
+      alert("Failed to assign vendor. Please try again.");
+    }
+  };
+
   const getRequiredCategories = (booking: BookingRequest | null) => {
     if (!booking || !Array.isArray(booking.customizations) || booking.customizations.length === 0) {
       return [];
@@ -137,28 +160,85 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
     if (isNaN(date.getTime())) return "Invalid Date";
     return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   };
-  
-  // Stats now refer to 'bookings' data, and 'activeVendors' from the directly fetched vendors list.
-  const stats = { 
-    totalBookings: bookings.length, 
-    pendingBookings: bookings.filter(b => b.status === 'pending').length, 
-    totalRevenue: bookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0), 
-    activeVendors: vendors.length // Use 'vendors' state here
+
+  const stats = {
+    totalBookings: bookings.length,
+    pendingBookings: bookings.filter(b => b.status === 'pending').length,
+    totalRevenue: bookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0),
+    activeVendors: vendors.length
   };
-  
+
+  const filteredBookings = useMemo(() => {
+    return bookings.filter(booking => {
+      const searchTermLower = searchTerm.toLowerCase();
+      const matchesSearch = searchTerm === '' ||
+        booking.clientName.toLowerCase().includes(searchTermLower) ||
+        booking.packageName.toLowerCase().includes(searchTermLower);
+
+      const matchesStatus = statusFilter === 'all' || booking.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    });
+  }, [bookings, searchTerm, statusFilter]);
+
+  // NEW EXPORT TO CSV FUNCTION
+  const handleExportCSV = () => {
+    if (filteredBookings.length === 0) {
+      alert("No data to export.");
+      return;
+    }
+
+    // Define CSV headers
+    const headers = [
+      'Booking ID', 'Client Name', 'Package Name', 'Event Date',
+      'Status', 'Guest Count', 'Total Price', 'Customizations', 'Requirements'
+    ];
+
+    // Convert booking data to CSV rows
+    const rows = filteredBookings.map(booking => {
+      const customizations = booking.customizations.map(c => c.name).join('; ');
+      // Escape commas and double quotes in requirements to prevent CSV corruption
+      const requirements = `"${(booking.requirements || '').replace(/"/g, '""')}"`; // Ensure requirements is a string before replace
+
+      return [
+        booking.id,
+        booking.clientName,
+        booking.packageName,
+        formatDate(booking.eventDate), // Format date for CSV
+        booking.status,
+        booking.guestCount,
+        booking.totalPrice,
+        customizations,
+        requirements
+      ].join(',');
+    });
+
+    // Combine headers and rows
+    const csvContent = [headers.join(','), ...rows].join('\n');
+
+    // Create a Blob and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', `bookings-report-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url); // Clean up the URL object
+  };
+
   if (loading) return <div className="p-8 text-center">Loading Admin Dashboard...</div>;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* User Role Management Modal (removed as it's now in UserManagement) */}
-      {/* The isUserModalOpen, selectedUser, selectedRole, handleRoleUpdate, openUserModal states and functions are no longer needed here */}
-
       <div className="mb-8">
         <h2 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h2>
         <p className="text-gray-600">Oversee bookings, manage users, and configure the event catalog.</p>
       </div>
 
-      {/* NEW TABS UI */}
       <div className="mb-8 border-b border-gray-200">
         <nav className="-mb-px flex space-x-6" aria-label="Tabs">
           <button
@@ -182,7 +262,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
         </nav>
       </div>
 
-      {/* CONDITIONAL RENDERING BASED ON ACTIVE TAB */}
       {activeTab === 'bookings' && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -232,122 +311,177 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
             </div>
           </div>
           <div className="grid lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 bg-white rounded-2xl shadow-lg p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-6">Recent Bookings</h3>
-              <div className="space-y-4">
-                {bookings.length > 0 ? bookings.map((booking) => {
-                  const assignedCount = tasks.filter(t => t.bookingId === booking.id).length;
-                  return (
-                    <div key={booking.id} onClick={() => setSelectedBooking(booking)} className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedBooking?.id === booking.id ? 'border-purple-300 bg-purple-50' : 'border-gray-200 hover:border-purple-200'}`}>
-                       <div className="flex items-start justify-between mb-3">
-                         <div className="flex-1">
-                           <div className="flex items-center mb-2">
-                             <h4 className="font-semibold text-gray-900 mr-3">{booking.packageName}</h4>
-                             {getStatusIcon(booking.status)}
+            <div className="lg:col-span-2 space-y-8">
+              <div className="bg-white rounded-2xl shadow-lg p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-gray-900">Recent Bookings</h3>
+                  {/* NEW EXPORT BUTTON */}
+                  <button
+                    onClick={handleExportCSV}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-purple-700 bg-purple-100 rounded-lg hover:bg-purple-200 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export CSV
+                  </button>
+                </div>
+
+                <div className="mb-6 space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search by client or package name..."
+                      value={searchTerm}
+                      onChange={e => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-gray-600">Status:</span>
+                    {(['all', 'pending', 'confirmed', 'in-progress', 'completed', 'rejected'] as const).map(status => (
+                      <button
+                        key={status}
+                        onClick={() => setStatusFilter(status)}
+                        className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                          statusFilter === status
+                            ? 'bg-purple-600 text-white shadow-sm'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ')}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {filteredBookings.length > 0 ? filteredBookings.map((booking) => {
+                    const assignedCount = tasks.filter(t => t.bookingId === booking.id).length;
+                    return (
+                      <div key={booking.id} onClick={() => setSelectedBooking(booking)} className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${selectedBooking?.id === booking.id ? 'border-purple-300 bg-purple-50' : 'border-gray-200 hover:border-purple-200'}`}>
+                         <div className="flex items-start justify-between mb-3">
+                           <div className="flex-1">
+                             <div className="flex items-center mb-2">
+                               <h4 className="font-semibold text-gray-900 mr-3">{booking.packageName}</h4>
+                               {getStatusIcon(booking.status)}
+                             </div>
+                             <p className="text-sm text-gray-600 mb-2">Client: {booking.clientName}</p>
+                             <div className="flex items-center text-sm text-gray-500">
+                               <Calendar className="w-4 h-4 mr-1" />
+                               <span>{formatDate(booking.eventDate)}</span>
+                             </div>
                            </div>
-                           <p className="text-sm text-gray-600 mb-2">Client: {booking.clientName}</p>
-                           <div className="flex items-center text-sm text-gray-500">
-                             <Calendar className="w-4 h-4 mr-1" />
-                             <span>{formatDate(booking.eventDate)}</span>
+                           <div className="text-right">
+                             <p className="text-lg font-bold text-gray-900">${(booking.totalPrice || 0).toLocaleString()}</p>
+                             <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(booking.status)}`}>
+                               {booking.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                             </span>
                            </div>
                          </div>
-                         <div className="text-right">
-                           <p className="text-lg font-bold text-gray-900">${(booking.totalPrice || 0).toLocaleString()}</p>
-                           <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(booking.status)}`}>
-                             {booking.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                           </span>
-                         </div>
-                       </div>
-                        <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-                          <div className="flex items-center text-sm">
-                            <UserCheck className="w-4 h-4 mr-1 text-gray-400" />
-                            <span className="text-gray-600">Vendors: {assignedCount} assigned</span>
+                          <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                            <div className="flex items-center text-sm">
+                              <UserCheck className="w-4 h-4 mr-1 text-gray-400" />
+                              <span className="text-gray-600">Vendors: {assignedCount} assigned</span>
+                            </div>
+                            <ArrowRight className="w-4 h-4 text-gray-400" />
                           </div>
-                          <ArrowRight className="w-4 h-4 text-gray-400" />
-                        </div>
-                    </div>
-                  );
-                }) : <p className="text-gray-500 text-center py-8">No bookings found.</p>}
+                      </div>
+                    );
+                  }) : <p className="text-gray-500 text-center py-8">No bookings match the current filters.</p>}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-lg p-6">
+                <ActivityLog />
               </div>
             </div>
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-6">Booking Management</h3>
-              {selectedBooking ? (
-                <div className="space-y-6">
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">{selectedBooking.packageName}</h4>
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm text-gray-600 mb-3">Client: {selectedBooking.clientName}</p>
-                        {/* The "Manage" button is removed as user role management is now in UserManagement tab */}
-                        {/* <button onClick={() => openUserModal(selectedBooking.clientId)} className="text-xs text-blue-600 hover:underline">
-                            Manage
-                        </button> */}
+
+            <div className="space-y-8">
+              <div className="bg-white rounded-2xl shadow-lg p-6">
+                <h3 className="text-xl font-bold text-gray-900 mb-6">Booking Management</h3>
+                {selectedBooking ? (
+                  <div className="space-y-6">
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">{selectedBooking.packageName}</h4>
+                      <div className="flex items-center justify-between">
+                          <p className="text-sm text-gray-600 mb-3">Client: {selectedBooking.clientName}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">Booking Status</label>
-                    <div className="space-y-2">
-                      {(['pending', 'confirmed', 'in-progress', 'completed', 'rejected'] as const).map((status) => (
-                        <button 
-                          key={status} 
-                          onClick={() => updateBookingStatus(selectedBooking.id, status)} 
-                          className={`w-full p-3 rounded-xl border text-left transition-all ${selectedBooking.status === status ? 'border-purple-300 bg-purple-50 text-purple-700' : 'border-gray-200 hover:border-purple-200 hover:bg-purple-50'}`}
-                        >
-                          <div className="flex items-center">
-                            {getStatusIcon(status)}
-                            <span className="ml-3 font-medium">{status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">Vendor Assignments</label>
-                    <div className="space-y-3">
-                      {getRequiredCategories(selectedBooking).length > 0 ? getRequiredCategories(selectedBooking).map((category) => {
-                        const assignedTask = tasks.find(t => t.bookingId === selectedBooking.id && t.category === category);
-                        return (
-                          <div key={category} className="border border-gray-200 rounded-xl p-4">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-medium text-gray-900 capitalize">{category}</span>
-                              {assignedTask && <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Assigned</span>}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">Booking Status</label>
+                      <div className="space-y-2">
+                        {(['pending', 'confirmed', 'in-progress', 'completed', 'rejected'] as const).map((status) => (
+                          <button
+                            key={status}
+                            onClick={() => updateBookingStatus(selectedBooking.id, status)}
+                            className={`w-full p-3 rounded-xl border text-left transition-all ${selectedBooking.status === status ? 'border-purple-300 bg-purple-50 text-purple-700' : 'border-gray-200 hover:border-purple-200 hover:bg-purple-50'}`}
+                          >
+                            <div className="flex items-center">
+                              {getStatusIcon(status)}
+                              <span className="ml-3 font-medium">{status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
                             </div>
-                            {assignedTask ? (
-                              <p className="text-sm text-gray-600">{assignedTask.vendorName}</p>
-                            ) : (
-                              <select 
-                                onChange={(e) => assignVendor(selectedBooking, e.target.value, category)} 
-                                className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg text-sm" 
-                                defaultValue=""
-                              >
-                                <option value="">Select vendor...</option>
-                                {vendors.map((vendor) => (
-                                  <option key={vendor.uid} value={vendor.uid}>{vendor.name}</option>
-                                ))}
-                              </select>
-                            )}
-                          </div>
-                        );
-                      }) : <p className="text-sm text-gray-500">No specific vendor services required for this booking.</p>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">Vendor Assignments</label>
+                      <div className="space-y-3">
+                        {getRequiredCategories(selectedBooking).length > 0 ? getRequiredCategories(selectedBooking).map((category) => {
+                          const assignedTask = tasks.find(t => t.bookingId === selectedBooking.id && t.category === category);
+                          return (
+                            <div key={category} className="border border-gray-200 rounded-xl p-4">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-medium text-gray-900 capitalize">{category}</span>
+                                {assignedTask && <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Assigned</span>}
+                              </div>
+                              {assignedTask ? (
+                                <p className="text-sm text-gray-600">{assignedTask.vendorName}</p>
+                              ) : (
+                                <select
+                                  onChange={(e) => assignVendor(selectedBooking, e.target.value, category)}
+                                  className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-purple-500 focus:border-purple-500"
+                                  defaultValue=""
+                                >
+                                  <option value="">Select vendor...</option>
+                                  {vendors.map((vendor) => (
+                                    <option key={vendor.uid} value={vendor.uid}>{vendor.name}</option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                          );
+                        }) : <p className="text-sm text-gray-500">No specific vendor services required for this booking.</p>}
+                      </div>
+                    </div>
+
+                    <div className="border-t pt-6">
+                      <h4 className="font-semibold text-gray-900 mb-2">Chat with Client</h4>
+                      <div className="h-[500px] border border-gray-200 rounded-xl overflow-hidden">
+                        <ChatComponent booking={selectedBooking} currentUser={user} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Package className="w-8 h-8 text-gray-400" />
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Package className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h4 className="text-lg font-medium text-gray-900 mb-2">Select a booking</h4>
+                    <p className="text-gray-600">Choose a booking from the list to manage details, assign vendors, and chat with the client.</p>
                   </div>
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">Select a booking</h4>
-                  <p className="text-gray-600">Choose a booking from the list to manage details and assign vendors.</p>
-                </div>
-              )}
+                )}
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-lg p-6">
+                <VendorInsights vendors={vendors} reviews={reviews} tasks={tasks} />
+              </div>
             </div>
           </div>
         </>
       )}
 
-      {activeTab === 'users' && <UserManagement user={user} />} {/* Pass the user prop to UserManagement */}
-
+      {activeTab === 'users' && <UserManagement user={user} />}
       {activeTab === 'catalog' && <CatalogManager />}
 
     </div>

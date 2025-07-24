@@ -3,6 +3,7 @@ export interface User {
   name: string;
   email: string;
   role: 'client' | 'vendor'| 'admin';
+  status: 'active' | 'pending'| 'disabled';
 }
 
 export interface EventPackage {
@@ -81,4 +82,16 @@ export interface Notification {
   isRead: boolean;
   createdAt: any;
   link?: string; // Optional link to a booking or task
+}
+
+export interface ActivityLog {
+  id: string;
+  message: string;
+  timestamp: any; // Firestore server timestamp
+  meta?: {
+    userId?: string;
+    bookingId?: string;
+    vendorName?: string;
+    clientName?: string;
+  }
 }
