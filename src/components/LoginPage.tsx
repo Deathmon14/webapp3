@@ -128,40 +128,40 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       title: 'Client Account',
       description: 'Browse and book event packages',
       icon: <Users className="w-6 h-6" />,
-      color: 'from-purple-600 to-blue-600'
+      color: 'from-primary-600 to-secondary-600'
     },
     vendor: {
       title: 'Vendor Account',
       description: 'Manage event services and tasks',
       icon: <Briefcase className="w-6 h-6" />,
-      color: 'from-teal-600 to-green-600'
+      color: 'from-teal-600 to-green-600' // Keeping original for vendor as per prompt, assuming 'teal' maps to nothing specific and 'green' is success.
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-teal-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-3 mb-6">
-            <div className="w-12 h-12 bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-gradient-to-r from-primary-600 to-secondary-600 rounded-xl flex items-center justify-center shadow-lg">
               <Calendar className="w-7 h-7 text-white" />
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
               KAISRI
             </h1>
           </div>
-          <p className="text-xl text-gray-600">
+          <p className="text-xl text-neutral-700">
             {isLogin ? 'Welcome back!' : 'Create your account'}
           </p>
-          <p className="text-gray-500 mt-2">
+          <p className="text-neutral-500 mt-2">
             Book it. Forget it. Flaunt it.
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-white rounded-2xl shadow-card p-8">
           {signupSuccess && (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
-              <p className="text-green-800 text-sm font-medium">
+            <div className="bg-success-50 border border-success-200 rounded-xl p-4 mb-6">
+              <p className="text-success-800 text-sm font-medium">
                 Vendor account created! An administrator will review your request. You can log in once approved.
               </p>
             </div>
@@ -169,17 +169,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           <form onSubmit={isLogin ? handleLogin : handleSignup} className="space-y-6">
             {!isLogin && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-neutral-700 mb-2">
                   Full Name *
                 </label>
                 <div className="relative">
-                  <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-neutral-400" />
                   <input
                     type="text"
                     name="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                    className="input-base"
                     placeholder="Enter your full name"
                     required={!isLogin}
                   />
@@ -187,34 +187,34 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-neutral-700 mb-2">
                 Email Address *
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-neutral-400" />
                 <input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  className="input-base"
                   placeholder="Enter your email"
                   required
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-neutral-700 mb-2">
                 Password *
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-neutral-400" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                  className="input-base pr-12"
                   placeholder="Enter your password"
                   required
                   minLength={6}
@@ -222,18 +222,18 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
               {!isLogin && (
-                <p className="text-xs text-gray-500 mt-1">Password must be at least 6 characters</p>
+                <p className="text-xs text-neutral-500 mt-1">Password must be at least 6 characters</p>
               )}
             </div>
             {!isLogin && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
+                <label className="block text-sm font-medium text-neutral-700 mb-3">
                   Account Type *
                 </label>
                 <div className="grid grid-cols-2 gap-3">
@@ -242,8 +242,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                       key={role}
                       className={`relative cursor-pointer border-2 rounded-xl p-4 transition-all ${
                         formData.role === role
-                          ? 'border-purple-300 bg-purple-50'
-                          : 'border-gray-200 hover:border-purple-200'
+                          ? 'border-primary-300 bg-primary-50'
+                          : 'border-neutral-200 hover:border-primary-200'
                       }`}
                     >
                       <input
@@ -258,8 +258,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                         <div className={`w-10 h-10 bg-gradient-to-r ${info.color} rounded-lg flex items-center justify-center mx-auto mb-2 text-white`}>
                           {info.icon}
                         </div>
-                        <h4 className="font-medium text-gray-900 text-sm">{info.title}</h4>
-                        <p className="text-xs text-gray-600 mt-1">{info.description}</p>
+                        <h4 className="font-medium text-neutral-900 text-sm">{info.title}</h4>
+                        <p className="text-xs text-neutral-600 mt-1">{info.description}</p>
                       </div>
                     </label>
                   ))}
@@ -274,7 +274,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-3 px-4 rounded-xl font-medium hover:from-purple-700 hover:to-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              className="btn-primary w-full"
             >
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -288,7 +288,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-gray-600">
+            <p className="text-neutral-600">
               {isLogin ? "Don't have an account?" : 'Already have an account?'}
               <button
                 onClick={() => {
@@ -296,7 +296,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                   setError('');
                   setFormData({ name: '', email: '', password: '', role: 'client' });
                 }}
-                className="ml-2 text-purple-600 hover:text-purple-700 font-medium"
+                className="ml-2 text-primary-600 hover:text-primary-700 font-medium"
               >
                 {isLogin ? 'Sign up' : 'Sign in'}
               </button>
