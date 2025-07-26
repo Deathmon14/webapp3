@@ -1,6 +1,8 @@
+// src/components/VendorDashboard.tsx
+
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase'; // Assuming your firebase config is in src/lib/firebase.ts
+import { db } from '../lib/firebase';
 import { Calendar, Clock, CheckCircle, AlertCircle, FileText, User } from 'lucide-react';
 import { User as UserType, VendorTask } from '../types';
 
@@ -9,10 +11,10 @@ interface VendorDashboardProps {
 }
 
 const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
-  // State for live data from Firestore
   const [tasks, setTasks] = useState<VendorTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<VendorTask | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false); // New state for loading
 
   // Fetch tasks from Firestore in real-time
   useEffect(() => {
@@ -33,6 +35,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
 
   // Update task status in Firestore
   const updateTaskStatus = async (taskId: string, newStatus: VendorTask['status']) => {
+    setIsUpdating(true); // Set loading true when update starts
     const taskDocRef = doc(db, 'tasks', taskId);
     try {
       await updateDoc(taskDocRef, { status: newStatus });
@@ -43,6 +46,8 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
     } catch (error) {
       console.error("Error updating task status: ", error);
       alert("Failed to update task status.");
+    } finally {
+      setIsUpdating(false); // Set loading false when update finishes (success or error)
     }
   };
 
@@ -116,14 +121,14 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       {/* Header */}
       <div className="mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">
+        <h2 className="text-4xl font-bold text-neutral-900 mb-2">
           Welcome back, {user.name}!
         </h2>
-        <p className="text-gray-600">
-          Manage your assigned tasks and update event progress
+        <p className="text-lg text-neutral-600">
+          Here are your assigned tasks. Let's make some events happen.
         </p>
       </div>
 
@@ -183,7 +188,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
             {tasks.map((task) => {
               const relativeDate = getRelativeDateText(task.eventDate);
               return (
-                <div key={task.id} onClick={() => setSelectedTask(task)} className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md ${selectedTask?.id === task.id ? 'border-purple-300 bg-purple-50' : 'border-gray-200 hover:border-purple-200'}`}>
+                <div key={task.id} onClick={() => setSelectedTask(task)} className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 hover:shadow-md ${selectedTask?.id === task.id ? 'border-primary-300 bg-primary-50' : 'border-gray-200 hover:border-primary-200'}`}>
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
                       <h4 className="font-semibold text-gray-900 mb-1">{task.title}</h4>
@@ -247,11 +252,21 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-3">Update Status</label>
                 <div className="space-y-3">
                   {(['assigned', 'in-progress', 'completed'] as const).map((status) => (
-                    <button key={status} onClick={() => updateTaskStatus(selectedTask.id, status)} className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-200 ${selectedTask.status === status ? 'border-purple-300 bg-purple-50' : 'border-gray-200 hover:border-purple-200 hover:bg-purple-50'}`}>
+                    <button 
+                      key={status} 
+                      onClick={() => updateTaskStatus(selectedTask.id, status)} 
+                      disabled={isUpdating || selectedTask?.status === status}
+                      className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-200 ${selectedTask.status === status ? 'border-primary-300 bg-primary-50' : 'border-gray-200 hover:border-primary-200 hover:bg-primary-50'} ${isUpdating && selectedTask.status !== status ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
                       <div className="flex items-center">
                         {getStatusIcon(status)}
-                        <span className="ml-3 font-medium">{status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
-                        {selectedTask.status === status && <CheckCircle className="w-5 h-5 text-purple-600 ml-auto" />}
+                        <span className="ml-3 font-medium">
+                          {isUpdating && selectedTask.status !== status && (status === selectedTask.status + 1 || (status === 'assigned' && selectedTask.status === 'completed')) // Simple logic for "Updating..."
+                            ? 'Updating...' 
+                            : status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())
+                          }
+                        </span>
+                        {selectedTask.status === status && <CheckCircle className="w-5 h-5 text-primary-600 ml-auto" />}
                       </div>
                     </button>
                   ))}

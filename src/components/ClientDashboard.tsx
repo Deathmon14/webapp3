@@ -1,26 +1,22 @@
 // src/components/ClientDashboard.tsx
 import React, { useState, useEffect } from 'react';
-// Make sure to import 'query' and 'where' from firebase/firestore
 import { collection, getDocs, addDoc, serverTimestamp, doc, getDoc, setDoc, query, where, orderBy, onSnapshot, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Package, Star, ArrowRight, Check, Image, Users, Heart, Search, Eye, X, Calendar, Briefcase, XCircle, MessageSquare, DollarSign } from 'lucide-react';
 import { User, EventPackage, CustomizationOption, BookingRequest, Review } from '../types';
-import ChatModal from './ChatModal'; // Import the new ChatModal
+import ChatModal from './ChatModal';
 
 interface ClientDashboardProps {
   user: User;
 }
 
 const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
-  // All state declarations remain the same
   const [eventPackages, setEventPackages] = useState<EventPackage[]>([]);
   const [customizationOptions, setCustomizationOptions] = useState<CustomizationOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [bookings, setBookings] = useState<BookingRequest[]>([]);
-  // --- NEW STATE FOR UNAVAILABLE DATES ---
   const [unavailableDates, setUnavailableDates] = useState<string[]>([]);
-
   const [reviews, setReviews] = useState<Review[]>([]);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
   const [selectedBookingForReview, setSelectedBookingForReview] = useState<BookingRequest | null>(null);
@@ -37,9 +33,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
   const [requirements, setRequirements] = useState('');
   const [currentStep, setCurrentStep] = useState<'packages' | 'customize' | 'book'>('packages');
 
-
   useEffect(() => {
-    // --- CORRECTED AND SIMPLIFIED DATA FETCHING LOGIC ---
     const fetchStaticData = async () => {
       try {
         const packagesSnapshot = await getDocs(collection(db, 'packages'));
@@ -59,34 +53,30 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
       }
     };
 
-    // First, fetch all the data that doesn't need to be real-time
     fetchStaticData();
 
-    // Listener for current user's bookings
     const userBookingsQuery = query(collection(db, 'bookings'), where('clientId', '==', user.uid), orderBy('createdAt', 'desc'));
     const unsubscribeUserBookings = onSnapshot(userBookingsQuery, (snapshot) => {
       setBookings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as BookingRequest));
-      setLoading(false); // The component is ready to be displayed
+      setLoading(false);
     }, (error) => {
       console.error("Error fetching bookings in real-time:", error);
-      setLoading(false); // Stop loading even if there's an error
+      setLoading(false);
     });
 
-    // --- NEW: Listener for all confirmed/in-progress bookings to block dates ---
+    // NOTE: This is not scalable for a large number of bookings.
+    // In production, a Cloud Function should update a dedicated 'unavailableDates' collection.
     const allBookingsQuery = query(
       collection(db, 'bookings'), 
       where('status', 'in', ['confirmed', 'in-progress'])
     );
-
     const unsubscribeAllBookings = onSnapshot(allBookingsQuery, (snapshot) => {
-      // Extract only the eventDate strings
       const dates = snapshot.docs.map(doc => doc.data().eventDate as string);
       setUnavailableDates(dates);
     }, (error) => {
       console.error("Error fetching unavailable dates:", error);
     });
 
-    // Cleanup both listeners
     return () => {
       unsubscribeUserBookings(); 
       unsubscribeAllBookings();
@@ -107,12 +97,11 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
       };
       const docRef = await addDoc(collection(db, 'reviews'), newReviewData);
       
-      // Optimistically add new review to local state for immediate UI update
       setReviews(prev => [...prev, { 
         ...newReviewData, 
         id: docRef.id, 
-        createdAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 } // Approximate timestamp for local display
-      } as Review]); // Cast to Review type
+        createdAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 } 
+      } as Review]);
 
       alert('Thank you for your review!');
       setIsReviewOpen(false);
@@ -190,17 +179,14 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
       alert('Please select a package and an event date.');
       return;
     }
-    // Perform an additional check for unavailable dates right before booking
     if (unavailableDates.includes(eventDate)) {
         alert("The selected date is no longer available. Please choose another date.");
         return;
     }
 
     try {
-      // Use a batch write to ensure both operations succeed or fail together
       const batch = writeBatch(db);
 
-      // 1. Create the new booking document
       const newBookingRef = doc(collection(db, 'bookings'));
       batch.set(newBookingRef, {
         clientId: user.uid,
@@ -216,7 +202,6 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
         guestCount: guestCount,
       });
 
-      // 2. Create the activity log entry
       const logRef = doc(collection(db, 'activity_logs'));
       batch.set(logRef, {
         message: `${user.name} submitted a new booking request for "${selectedPackage.name}".`,
@@ -227,13 +212,12 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
         }
       });
 
-      // Commit the batch
       await batch.commit();
 
       alert('Booking request submitted successfully!');
       
       setCurrentStep('packages');
-      setView('bookings'); // Switch to the bookings tab to show the new booking
+      setView('bookings');
       setSelectedPackage(null);
       setSelectedCustomizations([]);
       setEventDate('');
@@ -253,14 +237,13 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     photography: { name: 'Photography', icon: <Image className="w-5 h-5" /> }
   };
 
-  // --- NEW ADVANCED DATEPICKER COMPONENT ---
   const DatePicker = ({ selectedDate, onDateChange, disabledDates }: { 
     selectedDate: string, 
     onDateChange: (date: string) => void,
     disabledDates: string[]
   }) => {
     const today = new Date();
-    today.setDate(today.getDate() + 1); // Events must be booked at least one day in advance
+    today.setDate(today.getDate() + 1);
     const minDate = today.toISOString().split('T')[0];
 
     const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -303,7 +286,6 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
 
     useEffect(() => {
       if (!isOpen) {
-        // Reset state when modal is closed
         setRating(0);
         setComment('');
       }
@@ -365,7 +347,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     const isCompleted = booking.status === 'completed';
 
     const hasReviewed = reviews.some(
-      (review) => review.packageId === booking.packageId && review.clientId === user.uid && review.bookingId === booking.id
+      (review) => review.packageId === booking.packageId && review.clientId === user.uid && review.bookingId === booking.id // Checks for bookingId
     );
     const isAwaitingPayment = booking.status === 'awaiting-payment';
 
@@ -420,7 +402,6 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
               )}
 
               <div className="relative pt-4">
-                {/* Timeline track */}
                 <div className="absolute left-4 top-6 h-[calc(100%-2rem)] w-0.5 bg-gray-200"></div>
                 
                 {statuses.map((status, index) => (
@@ -459,14 +440,13 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
               setSelectedBookingForChat(booking);
               setIsChatOpen(true);
             }}
-            disabled={isRejected} // Disable if rejected
+            disabled={isRejected}
             className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             <MessageSquare className="w-4 h-4" />
             {isRejected ? 'Booking Rejected' : 'Contact Admin'}
           </button>
 
-          {/* NEW REVIEW BUTTON */}
           {isCompleted && !isRejected && !hasReviewed && (
             <button
               onClick={() => {
@@ -496,7 +476,6 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
   if (currentStep === 'packages') {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* RENDER THE CHAT MODAL */}
         {isChatOpen && selectedBookingForChat && (
           <ChatModal 
             isOpen={isChatOpen}
@@ -506,7 +485,6 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
           />
         )}
 
-        {/* Review Modal */}
         <ReviewModal 
           isOpen={isReviewOpen} 
           onClose={() => setIsReviewOpen(false)} 
@@ -567,7 +545,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
             <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-8">
               {filteredPackages.map((pkg) => {
                 const isWishlisted = wishlist.includes(pkg.id);
-                const rating = getPackageRating(pkg.id); // Get rating for the package
+                const rating = getPackageRating(pkg.id);
                 return (
                   <div key={pkg.id} className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-all duration-300 border hover:border-purple-200">
                     <div className="relative h-64">
@@ -588,7 +566,6 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
                     <div className="p-6">
                       <h3 className="text-xl font-bold text-gray-900 mb-2">{pkg.name}</h3>
                       
-                      {/* Star Rating Display */}
                       <div className="flex items-center mb-3">
                         <div className="flex">
                           {[...Array(5)].map((_, i) => (
@@ -628,7 +605,6 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
             </div>
           )
         ) : (
-          // My Bookings View
           <div className="grid md:grid-cols-2 gap-8">
             {bookings.length > 0 ? (
               bookings.map(booking => <BookingStatusTracker key={booking.id} booking={booking} />)
@@ -723,7 +699,6 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
               <label className="block text-sm font-medium text-gray-700 mb-2">Expected Guests</label>
               <input type="number" value={guestCount} onChange={(e) => setGuestCount(Number(e.target.value))} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent" min="1" />
             </div>
-            {/* UPDATED DATEPICKER CALL */}
             <DatePicker selectedDate={eventDate} onDateChange={setEventDate} disabledDates={unavailableDates} />
           </div>
         </div>
@@ -779,7 +754,6 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     );
   }
 
-  // Booking view
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
@@ -838,7 +812,6 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
         <div className="bg-white rounded-2xl p-6 shadow-lg">
           <h3 className="text-xl font-bold text-gray-900 mb-6">Additional Information</h3>
           <div className="space-y-6">
-            {/* UPDATED DATEPICKER CALL */}
             <DatePicker selectedDate={eventDate} onDateChange={setEventDate} disabledDates={unavailableDates} />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Special Requirements</label>

@@ -1,3 +1,35 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-neutral-50 font-sans text-neutral-800 antialiased;
+  }
+
+  /* Improved accessibility for keyboard navigation */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2;
+  }
+}
+
+@layer components {
+  /* A custom button class for consistent primary actions */
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-5 py-2.5 font-semibold text-white bg-gradient-to-r from-primary-600 to-secondary-600 rounded-lg shadow-sm transition-all duration-200 ease-in-out;
+  }
+  .btn-primary:hover {
+    @apply shadow-md scale-[1.02];
+  }
+  .btn-primary:disabled {
+    @apply opacity-60 cursor-not-allowed scale-100 shadow-sm;
+  }
+
+  /* Consistent styling for input fields */
+  .input-base {
+    @apply w-full px-4 py-3 bg-white border border-neutral-300 rounded-xl transition-colors duration-200;
+  }
+  .input-base:focus {
+    @apply border-primary-500 ring-1 ring-primary-500;
+  }
+}
