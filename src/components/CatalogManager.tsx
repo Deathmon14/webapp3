@@ -7,7 +7,7 @@ import PackageList from './PackageList';
 import EditPackageForm from './EditPackageForm';
 import AddCustomizationOptionForm from './AddCustomizationOptionForm';
 import CustomizationOptionList from './CustomizationOptionList';
-import EditCustomizationOptionForm from './EditCustomizationOptionForm'; // 1. Import the new component
+import EditCustomizationOptionForm from './EditCustomizationOptionForm';
 
 const CatalogManager: React.FC = () => {
   const [editingPackage, setEditingPackage] = useState<EventPackage | null>(null);
@@ -52,7 +52,6 @@ const CatalogManager: React.FC = () => {
       <div className="mt-10 border-t pt-6">
         <h4 className="text-lg font-semibold text-gray-800">Customization Options</h4>
         {editingOption ? (
-          // 2. Replace the placeholder with the new component
           <EditCustomizationOptionForm option={editingOption} onUpdate={handleUpdate} onCancel={handleCancel} />
         ) : (
           !editingPackage && <AddCustomizationOptionForm />

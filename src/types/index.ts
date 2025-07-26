@@ -38,13 +38,14 @@ export interface BookingRequest {
   status: 'pending' | 'awaiting-payment' | 'confirmed' | 'in-progress' | 'completed'| 'rejected';
   createdAt: any;
   requirements: string;
-  guestCount: number; // Add this line
+  guestCount: number;
 }
 
 export interface VendorTask {
   id: string;
   bookingId: string;
   vendorId: string;
+  vendorName: string;
   category: string;
   title: string;
   description: string;
@@ -52,13 +53,6 @@ export interface VendorTask {
   deadline: string;
   clientRequirements: string;
   eventDate: string;
-}
-
-export interface VendorAssignment {
-  vendorId: string;
-  vendorName: string;
-  category: string;
-  status: 'assigned' | 'in-progress' | 'completed';
 }
 
 export interface Wishlist {
@@ -69,6 +63,7 @@ export interface Wishlist {
 export interface Review {
   id: string;
   packageId: string;
+  bookingId: string; // Added to accurately link review to a booking
   clientId: string;
   clientName: string;
   rating: number;
@@ -82,13 +77,13 @@ export interface Notification {
   message: string;
   isRead: boolean;
   createdAt: any;
-  link?: string; // Optional link to a booking or task
+  link?: string;
 }
 
 export interface ActivityLog {
   id: string;
   message: string;
-  timestamp: any; // Firestore server timestamp
+  timestamp: any;
   meta?: {
     userId?: string;
     bookingId?: string;

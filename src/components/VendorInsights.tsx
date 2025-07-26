@@ -8,22 +8,17 @@ interface VendorInsightsProps {
   vendors: User[];
   reviews: Review[];
   tasks: VendorTask[];
-  bookings: BookingRequest[]; // 1. Accept the bookings prop
+  bookings: BookingRequest[];
 }
 
 const VendorInsights: React.FC<VendorInsightsProps> = ({ vendors, reviews, tasks, bookings }) => {
   const getVendorStats = (vendorId: string) => {
-    // 2. --- CORRECTED LOGIC ---
+    // Corrected Logic: Tie reviews to specific bookings the vendor worked on.
     const vendorTasks = tasks.filter(task => task.vendorId === vendorId);
     const bookingIdsWorkedOn = [...new Set(vendorTasks.map(task => task.bookingId))];
     
-    // Find the packages associated with the bookings the vendor worked on
-    const packageIdsWorkedOn = bookings
-      .filter(booking => bookingIdsWorkedOn.includes(booking.id))
-      .map(booking => booking.packageId);
-
-    const relevantReviews = reviews.filter(review => packageIdsWorkedOn.includes(review.packageId));
-    // --- END OF CORRECTION ---
+    // Find reviews specifically for the bookings the vendor was a part of.
+    const relevantReviews = reviews.filter(review => bookingIdsWorkedOn.includes(review.bookingId));
 
     const averageRating = relevantReviews.length > 0
       ? relevantReviews.reduce((acc, review) => acc + review.rating, 0) / relevantReviews.length
