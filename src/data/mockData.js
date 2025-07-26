@@ -1,13 +1,7 @@
-// src/data/mockData.ts
-
-import { User, EventPackage, CustomizationOption, BookingRequest, VendorTask } from '../types';
-
 /**
  * USER DATA
- * Note: Keep this simple for easy role-based testing.
- * The application's signup flow should be used to create more users.
  */
-export const users: User[] = [
+export const users = [
   { uid: 'client01', name: 'Aisha Khan', email: 'aisha@example.com', role: 'client', status: 'active' },
   { uid: 'client02', name: 'Ben Carter', email: 'ben@example.com', role: 'client', status: 'active' },
   { uid: 'vendor01', name: 'Eternity Photography', email: 'contact@eternityphoto.com', role: 'vendor', status: 'active' },
@@ -16,12 +10,10 @@ export const users: User[] = [
   { uid: 'admin01', name: 'Admin User', email: 'admin@eventease.com', role: 'admin', status: 'active' }
 ];
 
-
 /**
  * EVENT PACKAGES
- * A diverse set of packages to showcase the platform's versatility.
  */
-export const eventPackages: EventPackage[] = [
+export const eventPackages = [
   {
     id: 'pkg_wedding_rustic',
     name: 'Rustic Barn Wedding',
@@ -77,9 +69,8 @@ export const eventPackages: EventPackage[] = [
 
 /**
  * CUSTOMIZATION OPTIONS
- * A wide variety of options for each category to allow for rich customization.
  */
-export const customizationOptions: CustomizationOption[] = [
+export const customizationOptions = [
   // --- VENUE ---
   {
     id: 'venue_barn_countryside',
@@ -220,10 +211,7 @@ export const customizationOptions: CustomizationOption[] = [
 ];
 
 /**
- * DYNAMIC DATA
- * Note: These are intentionally left empty.
- * The application is designed to generate bookings and tasks organically through user interaction.
- * Seeding this data can lead to inconsistencies.
+ * DYNAMIC DATA (Intentionally empty)
  */
-export const bookingRequests: BookingRequest[] = [];
-export const vendorTasks: VendorTask[] = [];
+export const bookingRequests = [];
+export const vendorTasks = [];
