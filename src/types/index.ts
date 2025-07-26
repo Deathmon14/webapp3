@@ -63,7 +63,7 @@ export interface Wishlist {
 export interface Review {
   id: string;
   packageId: string;
-  bookingId: string; // Added to accurately link review to a booking
+  bookingId: string; // <-- FIX: Added this field
   clientId: string;
   clientName: string;
   rating: number;

@@ -7,7 +7,7 @@ import PackageList from './PackageList';
 import EditPackageForm from './EditPackageForm';
 import AddCustomizationOptionForm from './AddCustomizationOptionForm';
 import CustomizationOptionList from './CustomizationOptionList';
-import EditCustomizationOptionForm from './EditCustomizationOptionForm';
+import EditCustomizationOptionForm from './EditCustomizationOptionForm'; // Import the edit form
 
 const CatalogManager: React.FC = () => {
   const [editingPackage, setEditingPackage] = useState<EventPackage | null>(null);
@@ -15,12 +15,12 @@ const CatalogManager: React.FC = () => {
 
   const handleEditPackage = (pkg: EventPackage) => {
     setEditingPackage(pkg);
-    setEditingOption(null);
+    setEditingOption(null); // Close other form if open
   };
 
   const handleEditOption = (option: CustomizationOption) => {
     setEditingOption(option);
-    setEditingPackage(null);
+    setEditingPackage(null); // Close other form if open
   };
 
   const handleCancel = () => {
@@ -43,7 +43,7 @@ const CatalogManager: React.FC = () => {
         {editingPackage ? (
           <EditPackageForm pkg={editingPackage} onUpdate={handleUpdate} onCancel={handleCancel} />
         ) : (
-          !editingOption && <AddPackageForm />
+          !editingOption && <AddPackageForm /> // Only show when not editing anything
         )}
         <PackageList onEdit={handleEditPackage} />
       </div>
@@ -52,9 +52,10 @@ const CatalogManager: React.FC = () => {
       <div className="mt-10 border-t pt-6">
         <h4 className="text-lg font-semibold text-gray-800">Customization Options</h4>
         {editingOption ? (
+          // FIX: Replace the placeholder with the actual edit form component
           <EditCustomizationOptionForm option={editingOption} onUpdate={handleUpdate} onCancel={handleCancel} />
         ) : (
-          !editingPackage && <AddCustomizationOptionForm />
+          !editingPackage && <AddCustomizationOptionForm /> // Only show when not editing anything
         )}
         <CustomizationOptionList onEdit={handleEditOption} />
       </div>

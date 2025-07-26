@@ -1,17 +1,16 @@
 // src/components/VendorInsights.tsx
 
 import React from 'react';
-import { User, Review, VendorTask, BookingRequest } from '../types';
+import { User, Review, VendorTask } from '../types';
 import { Star, CheckCircle, BarChart2 } from 'lucide-react';
 
 interface VendorInsightsProps {
   vendors: User[];
   reviews: Review[];
   tasks: VendorTask[];
-  bookings: BookingRequest[];
 }
 
-const VendorInsights: React.FC<VendorInsightsProps> = ({ vendors, reviews, tasks, bookings }) => {
+const VendorInsights: React.FC<VendorInsightsProps> = ({ vendors, reviews, tasks }) => {
   const getVendorStats = (vendorId: string) => {
     // Corrected Logic: Tie reviews to specific bookings the vendor worked on.
     const vendorTasks = tasks.filter(task => task.vendorId === vendorId);

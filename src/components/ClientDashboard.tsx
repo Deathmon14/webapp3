@@ -98,6 +98,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     try {
       const newReviewData = {
         packageId: selectedBookingForReview.packageId,
+        bookingId: selectedBookingForReview.id, // <-- FIX: Pass the booking ID
         clientId: user.uid,
         clientName: user.name,
         rating,
@@ -364,7 +365,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     const isCompleted = booking.status === 'completed';
 
     const hasReviewed = reviews.some(
-      (review) => review.packageId === booking.packageId && review.clientId === user.uid
+      (review) => review.packageId === booking.packageId && review.clientId === user.uid && review.bookingId === booking.id
     );
     const isAwaitingPayment = booking.status === 'awaiting-payment';
 
