@@ -1,3 +1,4 @@
+// src/types/index.ts
 export interface User {
   uid: string;
   name: string;
@@ -34,7 +35,7 @@ export interface BookingRequest {
   customizations: CustomizationOption[];
   totalPrice: number;
   eventDate: string;
-  status: 'pending' | 'confirmed' | 'in-progress' | 'completed'| 'rejected';
+  status: 'pending' | 'awaiting-payment' | 'confirmed' | 'in-progress' | 'completed'| 'rejected';
   createdAt: any;
   requirements: string;
   guestCount: number; // Add this line

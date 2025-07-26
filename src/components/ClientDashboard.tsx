@@ -1,8 +1,9 @@
+// src/components/ClientDashboard.tsx
 import React, { useState, useEffect } from 'react';
 // Make sure to import 'query' and 'where' from firebase/firestore
 import { collection, getDocs, addDoc, serverTimestamp, doc, getDoc, setDoc, query, where, orderBy, onSnapshot, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Package, Star, ArrowRight, Check, Image, Users, Heart, Search, Eye, X, Calendar, Briefcase, XCircle, MessageSquare } from 'lucide-react';
+import { Package, Star, ArrowRight, Check, Image, Users, Heart, Search, Eye, X, Calendar, Briefcase, XCircle, MessageSquare, DollarSign } from 'lucide-react';
 import { User, EventPackage, CustomizationOption, BookingRequest, Review } from '../types';
 import ChatModal from './ChatModal'; // Import the new ChatModal
 
@@ -357,17 +358,16 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
   };
 
   const BookingStatusTracker = ({ booking }: { booking: BookingRequest }) => {
-    const statuses: BookingRequest['status'][] = ['pending', 'confirmed', 'in-progress', 'completed'];
+    const statuses: BookingRequest['status'][] = ['pending', 'awaiting-payment', 'confirmed', 'in-progress', 'completed'];
     const currentStatusIndex = statuses.indexOf(booking.status);
     const isRejected = booking.status === 'rejected';
-    // isVendorAssigned is true if status is 'confirmed', 'in-progress', or 'completed'
-    const isVendorAssigned = currentStatusIndex >= statuses.indexOf('confirmed'); 
     const isCompleted = booking.status === 'completed';
 
-    // Check if the user has already reviewed this specific booking's package
     const hasReviewed = reviews.some(
       (review) => review.packageId === booking.packageId && review.clientId === user.uid
     );
+    const isAwaitingPayment = booking.status === 'awaiting-payment';
+
 
     return (
       <div className="bg-white rounded-2xl shadow-lg p-6 border hover:border-purple-200 transition-all flex flex-col">
@@ -443,6 +443,16 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
         </div>
         
         <div className="mt-4 pt-4 border-t flex flex-col gap-2">
+           {isAwaitingPayment && (
+            <button
+              onClick={() => alert("Redirecting to Razorpay...")}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <DollarSign className="w-4 h-4" />
+              Proceed to Payment
+            </button>
+          )}
+
           <button 
             onClick={() => {
               setSelectedBookingForChat(booking);

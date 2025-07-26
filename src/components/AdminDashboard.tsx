@@ -185,6 +185,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   const getStatusIcon = (status: BookingRequest['status']) => {
     switch (status) {
       case 'pending': return <Clock className="w-5 h-5 text-orange-500" />;
+      case 'awaiting-payment': return <DollarSign className="w-5 h-5 text-yellow-500" />;
       case 'confirmed': return <CheckCircle className="w-5 h-5 text-blue-500" />;
       case 'in-progress': return <Settings className="w-5 h-5 text-purple-500" />;
       case 'completed': return <CheckCircle className="w-5 h-5 text-green-500" />;
@@ -196,6 +197,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   const getStatusColor = (status: BookingRequest['status']) => {
     switch (status) {
       case 'pending': return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'awaiting-payment': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'confirmed': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'in-progress': return 'bg-purple-100 text-purple-700 border-purple-200';
       case 'completed': return 'bg-green-100 text-green-700 border-green-200';
@@ -209,7 +211,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
     if (isNaN(date.getTime())) return "Invalid Date";
     return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   };
-
+  
   if (loading) return <div className="p-8 text-center">Loading Admin Dashboard...</div>;
 
   return (
@@ -270,7 +272,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium text-gray-600">Status:</span>
-                    {(['all', 'pending', 'confirmed', 'in-progress', 'completed', 'rejected'] as const).map((status) => (
+                    {(['all', 'pending', 'awaiting-payment', 'confirmed', 'in-progress', 'completed', 'rejected'] as const).map((status) => (
                       <button key={status} onClick={() => setStatusFilter(status)} className={`px-3 py-1 rounded-full text-xs font-semibold transition ${statusFilter === status ? 'bg-purple-600 text-white shadow-sm' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>
                         {status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ')}
                       </button>
@@ -302,7 +304,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-3">Booking Status</label>
-                      <div className="space-y-2">{(['pending', 'confirmed', 'in-progress', 'completed', 'rejected'] as const).map((status) => (<button key={status} onClick={() => updateBookingStatus(selectedBooking.id, status)} className={`w-full p-3 rounded-xl border text-left transition-all ${selectedBooking.status === status ? 'border-purple-300 bg-purple-50 text-purple-700' : 'border-gray-200 hover:border-purple-200 hover:bg-purple-50'}`}><div className="flex items-center">{getStatusIcon(status)}<span className="ml-3 font-medium">{status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span></div></button>))}</div>
+                      <div className="space-y-2">{(['pending', 'awaiting-payment', 'confirmed', 'in-progress', 'completed', 'rejected'] as const).map((status) => (<button key={status} onClick={() => updateBookingStatus(selectedBooking.id, status)} className={`w-full p-3 rounded-xl border text-left transition-all ${selectedBooking.status === status ? 'border-purple-300 bg-purple-50 text-purple-700' : 'border-gray-200 hover:border-purple-200 hover:bg-purple-50'}`}><div className="flex items-center">{getStatusIcon(status)}<span className="ml-3 font-medium">{status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}</span></div></button>))}</div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-3">Vendor Assignments</label>
