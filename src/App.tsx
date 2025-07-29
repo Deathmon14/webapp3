@@ -10,6 +10,7 @@ import ClientDashboard from './components/ClientDashboard';
 import VendorDashboard from './components/VendorDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import { User as UserType, Notification } from './types';
+import { useTheme } from './context/ThemeContext';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
@@ -17,6 +18,7 @@ function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -32,21 +34,25 @@ function App() {
               role: userData.role,
               status: userData.status
             });
+            setTheme(userData.role); // Set theme based on user role
           } else {
             console.error('User document not found in Firestore');
             setCurrentUser(null);
+            setTheme('client'); // Default theme
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
           setCurrentUser(null);
+          setTheme('client');
         }
       } else {
         setCurrentUser(null);
+        setTheme('client');
       }
       setLoading(false);
     });
     return () => unsubscribeAuth();
-  }, []);
+  }, [setTheme]);
 
   useEffect(() => {
     if (currentUser) {
@@ -99,14 +105,16 @@ function App() {
       case 'vendor':
         return <Settings className="w-5 h-5" />;
       case 'admin':
-        return <ShieldCheck className="w-5 h-5" />; // Updated icon for admin
+        return <ShieldCheck className="w-5 h-5" />;
       default:
         return <User className="w-5 h-5" />;
     }
   };
 
   const renderDashboard = () => {
-    if (!currentUser) return null;
+    if (!currentUser) {
+       return <LoginPage onLogin={setCurrentUser} />;
+    }
 
     switch (currentUser.role) {
       case 'client':
@@ -133,36 +141,33 @@ function App() {
     return (
       <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-gradient-to-r from-primary-600 to-secondary-600 rounded-xl flex items-center justify-center mb-4 mx-auto">
+          <div className="w-16 h-16 bg-gradient-to-r from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center mb-4 mx-auto animate-float">
             <Calendar className="w-8 h-8 text-white" />
           </div>
-          <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin mx-auto"></div>
+          <div className="w-8 h-8 border-4 border-primary-500/20 border-t-primary-500 rounded-full animate-spin mx-auto"></div>
           <p className="text-neutral-600 mt-4">Loading KAISRI...</p>
         </div>
       </div>
     );
   }
 
-  if (!currentUser) {
-    return <LoginPage onLogin={setCurrentUser} />;
-  }
-
   return (
-    <div className="min-h-screen bg-neutral-50">
-      <header className="bg-white/90 backdrop-blur-sm border-b border-neutral-200 sticky top-0 z-50">
+    <div className={`theme-${theme} min-h-screen bg-gradient-to-br from-primary-50 via-secondary-50 to-accent-50`}>
+      <header className="bg-surface/80 backdrop-blur-lg border-b border-white/30 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-r from-primary-600 to-secondary-600 rounded-lg flex items-center justify-center shadow-md">
+              <div className="w-8 h-8 bg-gradient-to-r from-primary to-secondary rounded-lg flex items-center justify-center shadow-md">
                 <Calendar className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
+              <h1 className="text-xl font-bold text-primary">
                 KAISRI
               </h1>
             </div>
+            {currentUser && (
             <div className="hidden md:flex items-center space-x-4">
-              <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-neutral-100 text-neutral-700">
-                {currentUser && getUserIcon()} {/* Ensure currentUser exists before calling getUserIcon */}
+              <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-white/50 text-neutral-700">
+                {getUserIcon()}
                 <span className="text-sm font-medium">
                   {currentUser.name}
                 </span>
@@ -217,6 +222,7 @@ function App() {
                 <span className="text-sm font-medium">Logout</span>
               </button>
             </div>
+            )}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="md:hidden p-2 rounded-lg hover:bg-neutral-100 transition-colors"
@@ -227,7 +233,7 @@ function App() {
           {mobileMenuOpen && (
             <div className="md:hidden py-4 border-t border-neutral-200">
               <div className="flex items-center space-x-2 px-3 py-2 mb-3">
-                {currentUser && getUserIcon()} {/* Ensure currentUser exists before calling getUserIcon */}
+                {currentUser && getUserIcon()}
                 <span className="text-sm font-medium text-neutral-700">
                   {currentUser.name}
                 </span>

@@ -46,7 +46,8 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
   useEffect(() => {
     const fetchStaticData = async () => {
       try {
-        const packagesSnapshot = await getDocs(collection(db, 'packages'));
+        const packagesQuery = query(collection(db, 'packages'), where("isArchived", "!=", true));
+        const packagesSnapshot = await getDocs(packagesQuery);
         setEventPackages(packagesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as EventPackage));
 
         const optionsSnapshot = await getDocs(collection(db, 'customizationOptions'));
@@ -148,7 +149,8 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
   };
 
   const filteredPackages = eventPackages
-    .filter(pkg => !pkg.isArchived) // Filter out archived packages
+    // This client-side filter is now redundant but safe to keep
+    .filter(pkg => !pkg.isArchived) 
     .filter(pkg => {
       if (view === 'saved' && !wishlist.includes(pkg.id)) return false;
       if (searchTerm && !pkg.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;

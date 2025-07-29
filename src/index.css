@@ -2,28 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@600;700&display=swap');
+
 @layer base {
+  /* Default Theme (Client) */
+  :root {
+    --color-primary: 139 92 246; /* purple-500 */
+    --color-primary-50: 245 243 255;
+    --color-primary-100: 238 232 255;
+    --color-primary-500: 139 92 246;
+    --color-primary-600: 124 58 237;
+    --color-primary-800: 88 28 135;
+    --color-secondary: 56 189 248; /* sky-400 */
+    --color-secondary-500: 56 189 248;
+    --color-accent: 34 197 94; /* green-500 */
+    --color-accent-500: 34 197 94;
+    --color-surface: 248 250 252; /* slate-50 */
+  }
+
+  /* Vendor Theme */
+  .theme-vendor {
+    --color-primary: 22 163 74; /* green-600 */
+    --color-primary-50: 240 253 244;
+    --color-primary-100: 220 252 231;
+    --color-primary-500: 34 197 94;
+    --color-primary-600: 22 163 74;
+    --color-primary-800: 21 128 61;
+    --color-secondary: 14 165 233; /* sky-500 */
+    --color-secondary-500: 14 165 233;
+    --color-accent: 234 179 8; /* yellow-500 */
+    --color-accent-500: 234 179 8;
+    --color-surface: 248 250 252;
+  }
+
+  /* Admin Theme */
+  .theme-admin {
+    --color-primary: 220 38 38; /* red-600 */
+    --color-primary-50: 254 242 242;
+    --color-primary-100: 254 226 226;
+    --color-primary-500: 239 68 68;
+    --color-primary-600: 220 38 38;
+    --color-primary-800: 153 27 27;
+    --color-secondary: 124 58 237; /* purple-600 */
+    --color-secondary-500: 124 58 237;
+    --color-accent: 249 115 22; /* orange-500 */
+    --color-accent-500: 249 115 22;
+    --color-surface: 248 250 252;
+  }
+
   body {
-    @apply bg-neutral-50 font-sans text-neutral-800 antialiased;
-    /* Optional: Add a subtle background texture for a premium feel */
-    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d4d4d8' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    @apply bg-surface font-sans text-neutral-800 antialiased;
+    font-family: 'Inter', sans-serif;
   }
 
-  /* Add a smooth transition to almost every element */
-  * {
-    @apply transition-colors duration-200;
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', sans-serif;
   }
 
-  /* Improved accessibility for keyboard navigation */
   *:focus-visible {
     @apply outline-none ring-2 ring-primary-500 ring-offset-2;
   }
 }
 
 @layer components {
-  /* A custom button class for consistent primary actions */
   .btn-primary {
-    @apply inline-flex items-center justify-center px-5 py-2.5 font-semibold text-white bg-gradient-to-r from-primary-600 to-secondary-600 rounded-lg shadow-sm transition-all duration-200 ease-in-out;
+    @apply inline-flex items-center justify-center px-5 py-2.5 font-semibold text-white bg-gradient-to-r from-primary-600 to-secondary-500 rounded-lg shadow-sm transition-all duration-200 ease-in-out;
   }
   .btn-primary:hover {
     @apply shadow-md scale-[1.02];
@@ -32,11 +75,30 @@
     @apply opacity-60 cursor-not-allowed scale-100 shadow-sm;
   }
 
-  /* Consistent styling for input fields */
   .input-base {
     @apply w-full px-4 py-3 bg-white border border-neutral-300 rounded-xl transition-colors duration-200;
   }
   .input-base:focus {
     @apply border-primary-500 ring-1 ring-primary-500;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-white/20 dark:bg-slate-800/20 backdrop-blur-md border border-white/30 dark:border-slate-700/30;
+  }
+  .card-modern {
+    @apply glass rounded-3xl p-6 shadow-2xl hover:shadow-[0_0_35px_rgba(139,92,246,.2)];
+  }
+  .hover-scale {
+    @apply transition-transform duration-300 ease-in-out;
+  }
+  .hover-scale:hover {
+    @apply scale-105;
+  }
+  .btn-3d {
+    @apply inline-flex items-center justify-center px-5 py-2.5 font-semibold rounded-2xl shadow-lg
+           bg-gradient-to-br from-primary-500 to-secondary-500 text-white
+           hover:scale-105 hover:shadow-[0_0_25px_rgba(139,92,246,.5)] transition-all duration-300;
   }
 }

@@ -1,14 +1,13 @@
 // src/components/PackageList.tsx
 
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, where } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { EventPackage } from '../types';
 import { Trash2, Edit } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { EmptyState } from './EmptyState'; // Import the new EmptyState component
 
-// Add onEdit to the props interface
 interface PackageListProps {
   onEdit: (pkg: EventPackage) => void;
 }
@@ -18,10 +17,10 @@ const PackageList: React.FC<PackageListProps> = ({ onEdit }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'packages'), (snapshot) => {
+    const q = query(collection(db, 'packages'), where("isArchived", "!=", true));
+    const unsub = onSnapshot(q, (snapshot) => {
       const packagesData = snapshot.docs
-        .map(doc => ({ id: doc.id, ...doc.data() } as EventPackage))
-        .filter(pkg => !pkg.isArchived); // Filter out archived packages
+        .map(doc => ({ id: doc.id, ...doc.data() } as EventPackage));
       setPackages(packagesData);
       setLoading(false);
     }, (err) => {
@@ -70,7 +69,6 @@ const PackageList: React.FC<PackageListProps> = ({ onEdit }) => {
             </div>
           ))
         ) : (
-          // Empty state for PackageList
           <EmptyState variant="packages" />
         )}
       </div>

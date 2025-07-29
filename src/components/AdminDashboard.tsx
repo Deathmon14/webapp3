@@ -1,7 +1,7 @@
 // src/components/AdminDashboard.tsx
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, query, where, doc, updateDoc, addDoc, serverTimestamp, writeBatch, getDoc, orderBy, limit, startAfter, getDocs } from 'firebase/firestore'; // Added orderBy, limit, startAfter, getDocs
+import { collection, onSnapshot, query, where, doc, updateDoc, addDoc, serverTimestamp, writeBatch, getDoc, orderBy, limit, startAfter, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import {
   Calendar, Users, Package, CheckCircle, Clock, AlertCircle, DollarSign, UserCheck, ArrowRight, Settings, XCircle, Search, Download, BarChartHorizontal
@@ -37,7 +37,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   // Pagination states
   const [lastDoc, setLastDoc] = useState<any>(null);
   const [hasMore, setHasMore] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false); // New state for loading more
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   useEffect(() => {
     const fetchInitialBookings = async () => {
@@ -49,7 +49,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
           limit(PAGE_SIZE)
         );
 
-        // Apply status filter if not 'all'
         if (statusFilter !== 'all') {
           bookingsQueryRef = query(
             collection(db, 'bookings'),
@@ -74,7 +73,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
 
     fetchInitialBookings();
 
-    // Fetch other static data that doesn't need pagination
     const vendorQuery = query(collection(db, 'users'), where('role', '==', 'vendor'));
     const unsubVendors = onSnapshot(vendorQuery, (snapshot) => {
       const vendorsData = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as unknown as User));
@@ -102,7 +100,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
       unsubReviews();
       unsubPackages();
     };
-  }, [statusFilter]); // Re-fetch initial page when status filter changes
+  }, [statusFilter]);
 
   useEffect(() => {
     if (selectedBooking?.id) {
@@ -123,7 +121,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
         limit(PAGE_SIZE)
       );
 
-      // Apply status filter if not 'all' for subsequent loads
       if (statusFilter !== 'all') {
         nextQueryRef = query(
           collection(db, 'bookings'),
@@ -147,10 +144,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
     }
   };
 
-
   const filteredBookings = useMemo(() => {
-    // With server-side pagination, filtering by searchTerm happens client-side only on the fetched data.
-    // For full search, you'd need a more advanced backend search solution (e.g., Algolia, Firestore full-text search extensions).
     return bookings.filter(booking => {
       const searchTermLower = searchTerm.toLowerCase();
       const matchesSearch = searchTerm === '' ||
@@ -162,12 +156,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
 
 
   const stats = {
-    totalBookings: bookings.length, // Note: This will only show count of currently loaded bookings
-    pendingBookings: bookings.filter(b => b.status === 'pending').length, // Same here
+    totalBookings: bookings.length,
+    pendingBookings: bookings.filter(b => b.status === 'pending').length,
     totalRevenue: bookings
       .filter(b => b.status !== 'rejected')
       .reduce((sum, b) => sum + (b.totalPrice || 0), 0),
-    activeVendors: vendors.length // This is still accurate as all vendors are fetched
+    activeVendors: vendors.length
   };
 
     const handleExportCSV = () => {
@@ -211,6 +205,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
     const bookingDocRef = doc(db, 'bookings', bookingId);
     try {
       await updateDoc(bookingDocRef, { status: newStatus });
+      
+      // FIX: Update the local state to trigger a re-render
+      setBookings(prevBookings =>
+        prevBookings.map(b =>
+          b.id === bookingId ? { ...b, status: newStatus } : b
+        )
+      );
+
       const booking = bookings.find(b => b.id === bookingId);
       if (booking) {
         const message = `The status of your booking for "${booking.packageName}" has been updated to ${newStatus.replace('-', ' ')}.`;
@@ -315,7 +317,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   const formatDate = (dateString: any) => {
     const date = dateString?.seconds ? new Date(dateString.seconds * 1000) : new Date(dateString);
     if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toISOString().split('T')[0]; // Format to YYYY-MM-DD for comparison
+    return date.toISOString().split('T')[0];
   };
 
   if (loading) return <div className="p-8 text-center">Loading Admin Dashboard...</div>;
@@ -476,7 +478,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
                 )}
               </div>
               <div className="bg-white rounded-2xl shadow-card p-6">
-                <VendorInsights vendors={vendors} reviews={reviews} tasks={tasks} bookings={bookings} />
+                <VendorInsights vendors={vendors} reviews={reviews} tasks={tasks} />
               </div>
             </div>
           </div>
