@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { PackagePlus } from 'lucide-react';
+import toast from 'react-hot-toast'; // Import toast
 
 const AddPackageForm = () => {
   const [packageName, setPackageName] = useState('');
@@ -19,6 +20,7 @@ const AddPackageForm = () => {
     e.preventDefault();
     if (!packageName || !basePrice || !features) {
       setMessage('Please fill in all required fields.');
+      toast.error('Please fill in all required fields.'); // Replaced alert
       return;
     }
     setLoading(true);
@@ -37,6 +39,7 @@ const AddPackageForm = () => {
       });
 
       setMessage('New package added successfully!');
+      toast.success('New package added successfully!'); // Replaced alert
       // Reset form
       setPackageName('');
       setDescription('');
@@ -47,6 +50,7 @@ const AddPackageForm = () => {
     } catch (error) {
       console.error("Error adding package:", error);
       setMessage('Failed to add package. Please try again.');
+      toast.error('Failed to add package. Please try again.'); // Replaced alert
     } finally {
       setLoading(false);
     }
@@ -74,7 +78,7 @@ const AddPackageForm = () => {
             <input type="text" value={features} onChange={e => setFeatures(e.target.value)} className="mt-1 w-full p-2 border rounded-md" placeholder="e.g., Floral arrangements, Basic lighting" required />
           </div>
         </div>
-        
+
         {/* Column 2 */}
         <div className="space-y-4">
            <div>
@@ -90,7 +94,7 @@ const AddPackageForm = () => {
             <label htmlFor="isPopular" className="ml-2 block text-sm text-gray-900">Mark as Popular</label>
           </div>
         </div>
-        
+
         {/* Full-width button and message */}
         <div className="md:col-span-2">
           <button type="submit" disabled={loading} className="w-full bg-green-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-green-700 transition disabled:opacity-50">

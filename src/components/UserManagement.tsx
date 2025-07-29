@@ -5,12 +5,13 @@ import { collection, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimest
 import { db } from '../lib/firebase';
 import { User } from '../types';
 import { Users, X, Search, Check, AlertCircle } from 'lucide-react';
+import toast from 'react-hot-toast'; // Import toast
 
 const UserManagement = () => {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [selectedRole, setSelectedRole] = useState<'client' | 'vendor' | 'admin'>('client');
@@ -35,23 +36,21 @@ const UserManagement = () => {
     try {
       const userDocRef = doc(db, 'users', selectedUser.uid);
       await updateDoc(userDocRef, { role: selectedRole });
-      alert(`Successfully updated ${selectedUser.name}'s role to ${selectedRole}.`);
+      toast.success(`Successfully updated ${selectedUser.name}'s role to ${selectedRole}.`); // Replaced alert
       setIsModalOpen(false);
       setSelectedUser(null);
     } catch (error) {
       console.error("Error updating user role:", error);
-      alert("Failed to update user role.");
+      toast.error("Failed to update user role."); // Replaced alert
     }
   };
 
   const handleApproveUser = async (user: User) => {
-    if (!window.confirm(`Are you sure you want to approve ${user.name}?`)) return;
+    if (!window.confirm(`Are you sure you want to approve ${user.name}?`)) return; // Kept confirm for critical action
     try {
-      // Note: We are not using a batch here since it's a single update + log, but you could
       const userDocRef = doc(db, 'users', user.uid);
       await updateDoc(userDocRef, { status: 'active' });
 
-      // Create the activity log entry
       await addDoc(collection(db, 'activity_logs'), {
         message: `Admin approved a new vendor: ${user.name}.`,
         timestamp: serverTimestamp(),
@@ -60,27 +59,27 @@ const UserManagement = () => {
         }
       });
 
-      alert(`${user.name} has been approved.`);
+      toast.success(`${user.name} has been approved.`); // Replaced alert
     } catch (error) {
       console.error("Error approving user:", error);
-      alert("Failed to approve user.");
+      toast.error("Failed to approve user."); // Replaced alert
     }
   };
 
   const handleRejectUser = async (user: User) => {
-    if (!window.confirm(`Are you sure you want to reject and delete ${user.name}? This action cannot be undone.`)) return;
+    if (!window.confirm(`Are you sure you want to reject and delete ${user.name}? This action cannot be undone.`)) return; // Kept confirm for critical action
     try {
       const userDocRef = doc(db, 'users', user.uid);
       await deleteDoc(userDocRef);
-      alert(`${user.name} has been rejected and deleted.`);
+      toast.success(`${user.name} has been rejected and deleted.`); // Replaced alert
     } catch (error) {
       console.error("Error rejecting user:", error);
-      alert("Failed to reject user.");
+      toast.error("Failed to reject user."); // Replaced alert
     }
   };
 
   const pendingUsers = allUsers.filter(user => user.status === 'pending');
-  const activeUsers = allUsers.filter(user => user.status !== 'pending' && 
+  const activeUsers = allUsers.filter(user => user.status !== 'pending' &&
     (user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
      user.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
@@ -162,9 +161,9 @@ const UserManagement = () => {
           <h3 className="text-xl font-bold text-gray-900 flex items-center"><Users className="w-6 h-6 mr-3 text-purple-600"/> Active Users</h3>
           <div className="relative w-1/3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="Search active users..." 
+            <input
+              type="text"
+              placeholder="Search active users..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border rounded-lg"

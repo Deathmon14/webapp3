@@ -6,6 +6,7 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'fire
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { User } from '../types';
+import toast from 'react-hot-toast'; // Import toast
 
 interface LoginPageProps {
   onLogin: (user: User) => void;
@@ -38,14 +39,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
-      
+
       const userDoc = await getDoc(doc(db, 'users', user.uid));
-      
+
       if (userDoc.exists()) {
         const userData = userDoc.data();
-        
+
         if (userData.status === 'pending') {
           setError('Your account is pending approval from an administrator. Please check back later.');
+          toast.error('Your account is pending approval from an administrator. Please check back later.'); // Replaced alert
           await auth.signOut();
           setLoading(false);
           return;
@@ -59,12 +61,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           status: userData.status
         };
         onLogin(userObject);
+        toast.success(`Welcome back, ${userData.name}!`); // Added toast for successful login
       } else {
         setError('User profile not found. Please contact support.');
+        toast.error('User profile not found. Please contact support.'); // Replaced alert
       }
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'Failed to log in. Please check your credentials.');
+      toast.error(error.message || 'Failed to log in. Please check your credentials.'); // Replaced alert
     } finally {
       setLoading(false);
     }
@@ -78,6 +83,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
     if (!formData.name.trim()) {
       setError('Please enter your full name.');
+      toast.error('Please enter your full name.'); // Replaced alert
       setLoading(false);
       return;
     }
@@ -85,7 +91,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
       const user = userCredential.user;
-      
+
       const isVendor = formData.role === 'vendor';
 
       const userData = {
@@ -104,6 +110,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         setSignupSuccess(true);
         setIsLogin(true);
         setFormData({ name: '', email: '', password: '', role: 'client' });
+        toast.success('Vendor account created! Pending admin approval.'); // Added toast for vendor signup success
       } else {
         const userObject: User = {
           uid: user.uid,
@@ -113,16 +120,18 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           status: 'active'
         };
         onLogin(userObject);
+        toast.success(`Welcome, ${userData.name}! Your client account is ready.`); // Added toast for client signup success
       }
 
     } catch (error: any) {
       console.error('Signup error:', error);
       setError(error.message || 'Failed to create account. Please try again.');
+      toast.error(error.message || 'Failed to create account. Please try again.'); // Replaced alert
     } finally {
       setLoading(false);
     }
   };
-  
+
   const roleInfo = {
     client: {
       title: 'Client Account',
@@ -134,7 +143,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       title: 'Vendor Account',
       description: 'Manage event services and tasks',
       icon: <Briefcase className="w-6 h-6" />,
-      color: 'from-teal-600 to-green-600' // Keeping original for vendor as per prompt, assuming 'teal' maps to nothing specific and 'green' is success.
+      color: 'from-teal-600 to-green-600'
     }
   };
 

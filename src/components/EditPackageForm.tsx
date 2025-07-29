@@ -5,6 +5,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { EventPackage } from '../types';
 import { Edit } from 'lucide-react';
+import toast from 'react-hot-toast'; // Import toast
 
 interface EditPackageFormProps {
   pkg: EventPackage;
@@ -35,6 +36,7 @@ const EditPackageForm: React.FC<EditPackageFormProps> = ({ pkg, onUpdate, onCanc
     e.preventDefault();
     if (!packageName || !basePrice || !features) {
       setMessage('Please fill in all required fields.');
+      toast.error('Please fill in all required fields.'); // Replaced alert
       return;
     }
     setLoading(true);
@@ -54,10 +56,12 @@ const EditPackageForm: React.FC<EditPackageFormProps> = ({ pkg, onUpdate, onCanc
       });
 
       setMessage('Package updated successfully!');
+      toast.success('Package updated successfully!'); // Replaced alert
       onUpdate();
     } catch (error) {
       console.error("Error updating package:", error);
       setMessage('Failed to update package. Please try again.');
+      toast.error('Failed to update package. Please try again.'); // Replaced alert
     } finally {
       setLoading(false);
     }
@@ -85,7 +89,7 @@ const EditPackageForm: React.FC<EditPackageFormProps> = ({ pkg, onUpdate, onCanc
             <input type="text" value={features} onChange={e => setFeatures(e.target.value)} className="mt-1 w-full p-2 border rounded-md" required />
           </div>
         </div>
-        
+
         {/* Column 2 */}
         <div className="space-y-4">
            <div>
@@ -101,7 +105,7 @@ const EditPackageForm: React.FC<EditPackageFormProps> = ({ pkg, onUpdate, onCanc
             <label htmlFor="isPopularEdit" className="ml-2 block text-sm text-gray-900">Mark as Popular</label>
           </div>
         </div>
-        
+
         {/* Full-width buttons and message */}
         <div className="md:col-span-2 flex items-center gap-4">
           <button type="button" onClick={onCancel} className="w-full bg-gray-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-gray-600 transition">
@@ -111,10 +115,10 @@ const EditPackageForm: React.FC<EditPackageFormProps> = ({ pkg, onUpdate, onCanc
             {loading ? 'Updating...' : 'Update Package'}
           </button>
         </div>
-        {message && <p className={`md:col-span-2 mt-2 text-sm text-center ${message.includes('success') ? 'text-green-600' : 'text-red-600'}`}>{message}</p>}
+        {message && <p className={`mt-2 text-sm text-center ${message.includes('success') ? 'text-green-600' : 'text-red-600'}`}>{message}</p>}
       </form>
     </div>
   );
 };
 
-export default EditPackageForm; // This line is the fix.
+export default EditPackageForm;

@@ -5,6 +5,8 @@ import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/f
 import { db } from '../lib/firebase';
 import { Calendar, Clock, CheckCircle, AlertCircle, FileText, User } from 'lucide-react';
 import { User as UserType, VendorTask } from '../types';
+import toast from 'react-hot-toast';
+import { VendorAvailabilityCalendar } from './VendorAvailabilityCalendar'; // Import the new component
 
 interface VendorDashboardProps {
   user: UserType;
@@ -14,40 +16,35 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
   const [tasks, setTasks] = useState<VendorTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<VendorTask | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false); // New state for loading
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  // Fetch tasks from Firestore in real-time
   useEffect(() => {
     setLoading(true);
-    // Create a query to get tasks where the vendorId matches the current user's uid
     const q = query(collection(db, 'tasks'), where('vendorId', '==', user.uid));
-    
-    // onSnapshot creates a real-time listener for the query
+
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const tasksData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as VendorTask[];
       setTasks(tasksData);
       setLoading(false);
     });
 
-    // Cleanup the listener when the component unmounts
-    return () => unsubscribe(); 
+    return () => unsubscribe();
   }, [user.uid]);
 
-  // Update task status in Firestore
   const updateTaskStatus = async (taskId: string, newStatus: VendorTask['status']) => {
-    setIsUpdating(true); // Set loading true when update starts
+    setIsUpdating(true);
     const taskDocRef = doc(db, 'tasks', taskId);
     try {
       await updateDoc(taskDocRef, { status: newStatus });
-      // The onSnapshot listener will automatically update the UI, but we can also update the selected task locally for immediate feedback
+      toast.success(`Task status updated to ${newStatus.replace('-', ' ')}!`);
       if (selectedTask?.id === taskId) {
         setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
       }
     } catch (error) {
       console.error("Error updating task status: ", error);
-      alert("Failed to update task status.");
+      toast.error("Failed to update task status.");
     } finally {
-      setIsUpdating(false); // Set loading false when update finishes (success or error)
+      setIsUpdating(false);
     }
   };
 
@@ -77,7 +74,6 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
     }
   };
 
-  // --- UPDATED DATE FORMATTING FUNCTIONS ---
   const formatDate = (dateString: any) => {
     const date = dateString?.seconds ? new Date(dateString.seconds * 1000) : new Date(dateString);
     if (isNaN(date.getTime())) return "Invalid Date";
@@ -106,7 +102,7 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
     if (diffDays <= 7) {
       return <span className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">Due in {diffDays} days</span>;
     }
-    return null; // No indicator if it's more than a week away
+    return null;
   };
 
   const stats = {
@@ -122,7 +118,6 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      {/* Header */}
       <div className="mb-8">
         <h2 className="text-4xl font-bold text-neutral-900 mb-2">
           Welcome back, {user.name}!
@@ -132,7 +127,6 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
         </p>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
           <div className="flex items-center justify-between">
@@ -181,7 +175,6 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
-        {/* Tasks List */}
         <div className="bg-white rounded-2xl shadow-lg p-6">
           <h3 className="text-xl font-bold text-gray-900 mb-6">Your Tasks</h3>
           <div className="space-y-4">
@@ -193,7 +186,6 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
                     <div className="flex-1">
                       <h4 className="font-semibold text-gray-900 mb-1">{task.title}</h4>
                       <p className="text-sm text-gray-600 mb-2">{task.description}</p>
-                      {/* --- UPDATED DATE DISPLAY --- */}
                       <div className="flex items-center text-sm text-gray-500">
                         <Calendar className="w-4 h-4 mr-1" />
                         <span>{formatDate(task.eventDate)}</span>
@@ -225,70 +217,73 @@ const VendorDashboard: React.FC<VendorDashboardProps> = ({ user }) => {
           </div>
         </div>
 
-        {/* Task Details */}
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">Task Details</h3>
-          {selectedTask ? (
-            <div className="space-y-6">
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-2">{selectedTask.title}</h4>
-                <p className="text-gray-600 mb-4">{selectedTask.description}</p>
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Event Date</label>
-                    <div className="flex items-center text-sm text-gray-900"><Calendar className="w-4 h-4 mr-2 text-gray-400" />{formatDate(selectedTask.eventDate)}</div>
+        <div className="space-y-8"> {/* Added a div to contain both the Task Details and Calendar */}
+          <div className="bg-white rounded-2xl shadow-lg p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-6">Task Details</h3>
+            {selectedTask ? (
+              <div className="space-y-6">
+                <div>
+                  <h4 className="font-semibold text-gray-900 mb-2">{selectedTask.title}</h4>
+                  <p className="text-gray-600 mb-4">{selectedTask.description}</p>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Event Date</label>
+                      <div className="flex items-center text-sm text-gray-900"><Calendar className="w-4 h-4 mr-2 text-gray-400" />{formatDate(selectedTask.eventDate)}</div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                      <div className="flex items-center text-sm text-gray-900"><User className="w-4 h-4 mr-2 text-gray-400" />{selectedTask.category.charAt(0).toUpperCase() + selectedTask.category.slice(1)}</div>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                    <div className="flex items-center text-sm text-gray-900"><User className="w-4 h-4 mr-2 text-gray-400" />{selectedTask.category.charAt(0).toUpperCase() + selectedTask.category.slice(1)}</div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Client Requirements</label>
+                  <div className="bg-gray-50 rounded-xl p-4"><p className="text-sm text-gray-700">{selectedTask.clientRequirements || 'No specific requirements provided.'}</p></div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">Update Status</label>
+                  <div className="space-y-3">
+                    {(['assigned', 'in-progress', 'completed'] as const).map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => updateTaskStatus(selectedTask.id, status)}
+                        disabled={isUpdating || selectedTask?.status === status}
+                        className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-200 ${selectedTask.status === status ? 'border-primary-300 bg-primary-50' : 'border-gray-200 hover:border-primary-200 hover:bg-primary-50'} ${isUpdating && selectedTask.status !== status ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <div className="flex items-center">
+                          {getStatusIcon(status)}
+                          <span className="ml-3 font-medium">
+                            {isUpdating && selectedTask.status !== status && (status === selectedTask.status + 1 || (status === 'assigned' && selectedTask.status === 'completed'))
+                              ? 'Updating...'
+                              : status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())
+                            }
+                          </span>
+                          {selectedTask.status === status && <CheckCircle className="w-5 h-5 text-primary-600 ml-auto" />}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="flex items-start">
+                    <FileText className="w-5 h-5 text-blue-600 mr-3 mt-0.5" />
+                    <div>
+                      <h5 className="font-medium text-blue-900 mb-1">Progress Updates</h5>
+                      <p className="text-sm text-blue-700">Status changes are automatically saved and visible to the event admin.</p>
+                    </div>
                   </div>
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Client Requirements</label>
-                <div className="bg-gray-50 rounded-xl p-4"><p className="text-sm text-gray-700">{selectedTask.clientRequirements || 'No specific requirements provided.'}</p></div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4"><FileText className="w-8 h-8 text-gray-400" /></div>
+                <h4 className="text-lg font-medium text-gray-900 mb-2">Select a task</h4>
+                <p className="text-gray-600">Choose a task from the list to view details and update its status.</p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Update Status</label>
-                <div className="space-y-3">
-                  {(['assigned', 'in-progress', 'completed'] as const).map((status) => (
-                    <button 
-                      key={status} 
-                      onClick={() => updateTaskStatus(selectedTask.id, status)} 
-                      disabled={isUpdating || selectedTask?.status === status}
-                      className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-200 ${selectedTask.status === status ? 'border-primary-300 bg-primary-50' : 'border-gray-200 hover:border-primary-200 hover:bg-primary-50'} ${isUpdating && selectedTask.status !== status ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      <div className="flex items-center">
-                        {getStatusIcon(status)}
-                        <span className="ml-3 font-medium">
-                          {isUpdating && selectedTask.status !== status && (status === selectedTask.status + 1 || (status === 'assigned' && selectedTask.status === 'completed')) // Simple logic for "Updating..."
-                            ? 'Updating...' 
-                            : status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())
-                          }
-                        </span>
-                        {selectedTask.status === status && <CheckCircle className="w-5 h-5 text-primary-600 ml-auto" />}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                <div className="flex items-start">
-                  <FileText className="w-5 h-5 text-blue-600 mr-3 mt-0.5" />
-                  <div>
-                    <h5 className="font-medium text-blue-900 mb-1">Progress Updates</h5>
-                    <p className="text-sm text-blue-700">Status changes are automatically saved and visible to the event admin.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4"><FileText className="w-8 h-8 text-gray-400" /></div>
-              <h4 className="text-lg font-medium text-gray-900 mb-2">Select a task</h4>
-              <p className="text-gray-600">Choose a task from the list to view details and update its status.</p>
-            </div>
-          )}
+            )}
+          </div>
+          {/* Render the VendorAvailabilityCalendar component */}
+          <VendorAvailabilityCalendar vendorId={user.uid} />
         </div>
       </div>
     </div>

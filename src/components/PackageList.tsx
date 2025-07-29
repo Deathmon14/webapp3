@@ -1,10 +1,12 @@
 // src/components/PackageList.tsx
 
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { EventPackage } from '../types';
 import { Trash2, Edit } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { EmptyState } from './EmptyState'; // Import the new EmptyState component
 
 // Add onEdit to the props interface
 interface PackageListProps {
@@ -17,7 +19,9 @@ const PackageList: React.FC<PackageListProps> = ({ onEdit }) => {
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'packages'), (snapshot) => {
-      const packagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as EventPackage));
+      const packagesData = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() } as EventPackage))
+        .filter(pkg => !pkg.isArchived); // Filter out archived packages
       setPackages(packagesData);
       setLoading(false);
     }, (err) => {
@@ -28,15 +32,14 @@ const PackageList: React.FC<PackageListProps> = ({ onEdit }) => {
     return () => unsub();
   }, []);
 
-  const handleDelete = async (packageId: string) => {
-    if (window.confirm('Are you sure you want to delete this package?')) {
-      try {
-        await deleteDoc(doc(db, 'packages', packageId));
-        alert('Package deleted successfully.');
-      } catch (err) {
-        console.error("Error deleting package:", err);
-        alert('Failed to delete package.');
-      }
+  const handleArchive = async (packageId: string) => {
+    if (!window.confirm('Archive this package? It will be hidden from users.')) return;
+    try {
+      await updateDoc(doc(db, 'packages', packageId), { isArchived: true });
+      toast.success('Package archived successfully.');
+    } catch (err) {
+      console.error("Error archiving package:", err);
+      toast.error('Failed to archive package.');
     }
   };
 
@@ -56,18 +59,19 @@ const PackageList: React.FC<PackageListProps> = ({ onEdit }) => {
                 <p className="text-sm text-gray-600">${pkg.basePrice.toLocaleString()}</p>
               </div>
               <div className="flex items-center space-x-3">
-                {/* Updated button with onClick handler */}
                 <button onClick={() => onEdit(pkg)} className="text-gray-500 hover:text-blue-600" title="Edit">
                   <Edit className="w-5 h-5" />
                 </button>
-                <button onClick={() => handleDelete(pkg.id)} className="text-gray-500 hover:text-red-600" title="Delete">
+                <button onClick={() => handleArchive(pkg.id)} className="text-amber-500 hover:text-amber-600" title="Archive">
                   <Trash2 className="w-5 h-5" />
+                  <span className="ml-1">Archive</span>
                 </button>
               </div>
             </div>
           ))
         ) : (
-          <p className="text-center text-gray-500">No event packages found.</p>
+          // Empty state for PackageList
+          <EmptyState variant="packages" />
         )}
       </div>
     </div>

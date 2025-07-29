@@ -1,7 +1,7 @@
 // src/components/AdminDashboard.tsx
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, query, where, doc, updateDoc, addDoc, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, doc, updateDoc, addDoc, serverTimestamp, writeBatch, getDoc, orderBy, limit, startAfter, getDocs } from 'firebase/firestore'; // Added orderBy, limit, startAfter, getDocs
 import { db } from '../lib/firebase';
 import {
   Calendar, Users, Package, CheckCircle, Clock, AlertCircle, DollarSign, UserCheck, ArrowRight, Settings, XCircle, Search, Download, BarChartHorizontal
@@ -12,11 +12,14 @@ import UserManagement from './UserManagement';
 import ChatComponent from './ChatComponent';
 import VendorInsights from './VendorInsights';
 import ActivityLog from './ActivityLog';
-import AnalyticsDashboard from './AnalyticsDashboard'; 
+import AnalyticsDashboard from './AnalyticsDashboard';
+import toast from 'react-hot-toast';
 
 interface AdminDashboardProps {
   user: User;
 }
+
+const PAGE_SIZE = 10; // Define page size for pagination
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   const [bookings, setBookings] = useState<BookingRequest[]>([]);
@@ -29,25 +32,59 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   const [activeTab, setActiveTab] = useState<'bookings' | 'users' | 'catalog' | 'analytics'>('bookings');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | BookingRequest['status']>('all');
-  const [isUpdating, setIsUpdating] = useState<string | null>(null); // For loading states
+  const [isUpdating, setIsUpdating] = useState<string | null>(null);
+
+  // Pagination states
+  const [lastDoc, setLastDoc] = useState<any>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false); // New state for loading more
 
   useEffect(() => {
-    const unsubBookings = onSnapshot(collection(db, 'bookings'), (snapshot) => {
-        const bookingsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as BookingRequest));
-        setBookings(bookingsData.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+    const fetchInitialBookings = async () => {
+      setLoading(true);
+      try {
+        let bookingsQueryRef = query(
+          collection(db, 'bookings'),
+          orderBy('createdAt', 'desc'),
+          limit(PAGE_SIZE)
+        );
+
+        // Apply status filter if not 'all'
+        if (statusFilter !== 'all') {
+          bookingsQueryRef = query(
+            collection(db, 'bookings'),
+            where('status', '==', statusFilter),
+            orderBy('createdAt', 'desc'),
+            limit(PAGE_SIZE)
+          );
+        }
+
+        const snap = await getDocs(bookingsQueryRef);
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as BookingRequest));
+        setBookings(data);
+        setLastDoc(snap.docs[snap.docs.length - 1] || null);
+        setHasMore(snap.docs.length === PAGE_SIZE);
+      } catch (error) {
+        console.error("Error fetching initial bookings:", error);
+        toast.error("Failed to load bookings.");
+      } finally {
         setLoading(false);
-      });
+      }
+    };
 
-      const vendorQuery = query(collection(db, 'users'), where('role', '==', 'vendor'));
-      const unsubVendors = onSnapshot(vendorQuery, (snapshot) => {
-        const vendorsData = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as unknown as User));
-        setVendors(vendorsData);
-      });
+    fetchInitialBookings();
 
-      const unsubTasks = onSnapshot(collection(db, 'tasks'), (snapshot) => {
-          const tasksData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VendorTask));
-          setTasks(tasksData);
-      });
+    // Fetch other static data that doesn't need pagination
+    const vendorQuery = query(collection(db, 'users'), where('role', '==', 'vendor'));
+    const unsubVendors = onSnapshot(vendorQuery, (snapshot) => {
+      const vendorsData = snapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() } as unknown as User));
+      setVendors(vendorsData);
+    });
+
+    const unsubTasks = onSnapshot(collection(db, 'tasks'), (snapshot) => {
+        const tasksData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as VendorTask));
+        setTasks(tasksData);
+    });
 
     const unsubReviews = onSnapshot(collection(db, 'reviews'), (snapshot) => {
       const reviewsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Review));
@@ -60,13 +97,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
     });
 
     return () => {
-      unsubBookings();
       unsubVendors();
       unsubTasks();
       unsubReviews();
       unsubPackages();
     };
-  }, []);
+  }, [statusFilter]); // Re-fetch initial page when status filter changes
 
   useEffect(() => {
     if (selectedBooking?.id) {
@@ -75,31 +111,68 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
     }
   }, [bookings, selectedBooking?.id]);
 
+  const loadMoreBookings = async () => {
+    if (!lastDoc || !hasMore || isLoadingMore) return;
+
+    setIsLoadingMore(true);
+    try {
+      let nextQueryRef = query(
+        collection(db, 'bookings'),
+        orderBy('createdAt', 'desc'),
+        startAfter(lastDoc),
+        limit(PAGE_SIZE)
+      );
+
+      // Apply status filter if not 'all' for subsequent loads
+      if (statusFilter !== 'all') {
+        nextQueryRef = query(
+          collection(db, 'bookings'),
+          where('status', '==', statusFilter),
+          orderBy('createdAt', 'desc'),
+          startAfter(lastDoc),
+          limit(PAGE_SIZE)
+        );
+      }
+
+      const snap = await getDocs(nextQueryRef);
+      const more = snap.docs.map(d => ({ id: d.id, ...d.data() } as BookingRequest));
+      setBookings(prev => [...prev, ...more]);
+      setLastDoc(snap.docs[snap.docs.length - 1] || null);
+      setHasMore(snap.docs.length === PAGE_SIZE);
+    } catch (error) {
+      console.error("Error loading more bookings:", error);
+      toast.error("Failed to load more bookings.");
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+
   const filteredBookings = useMemo(() => {
+    // With server-side pagination, filtering by searchTerm happens client-side only on the fetched data.
+    // For full search, you'd need a more advanced backend search solution (e.g., Algolia, Firestore full-text search extensions).
     return bookings.filter(booking => {
       const searchTermLower = searchTerm.toLowerCase();
       const matchesSearch = searchTerm === '' ||
         booking.clientName.toLowerCase().includes(searchTermLower) ||
         booking.packageName.toLowerCase().includes(searchTermLower);
-
-      const matchesStatus = statusFilter === 'all' || booking.status === statusFilter;
-
-      return matchesSearch && matchesStatus;
+      return matchesSearch;
     });
-  }, [bookings, searchTerm, statusFilter]);
+  }, [bookings, searchTerm]);
+
 
   const stats = {
-    totalBookings: bookings.length,
-    pendingBookings: bookings.filter(b => b.status === 'pending').length,
+    totalBookings: bookings.length, // Note: This will only show count of currently loaded bookings
+    pendingBookings: bookings.filter(b => b.status === 'pending').length, // Same here
     totalRevenue: bookings
       .filter(b => b.status !== 'rejected')
       .reduce((sum, b) => sum + (b.totalPrice || 0), 0),
-    activeVendors: vendors.length
+    activeVendors: vendors.length // This is still accurate as all vendors are fetched
   };
 
     const handleExportCSV = () => {
         if (filteredBookings.length === 0) {
-            alert("No data to export.");
+            toast.error("No data to export.");
             return;
         }
         const headers = ['Booking ID', 'Client Name', 'Package Name', 'Event Date', 'Status', 'Guest Count', 'Total Price', 'Customizations', 'Requirements'];
@@ -134,7 +207,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
 
   const updateBookingStatus = async (bookingId: string, newStatus: BookingRequest['status']) => {
     if (!bookingId) return;
-    setIsUpdating(bookingId); // Set loading state
+    setIsUpdating(bookingId);
     const bookingDocRef = doc(db, 'bookings', bookingId);
     try {
       await updateDoc(bookingDocRef, { status: newStatus });
@@ -144,12 +217,23 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
         await addDoc(collection(db, 'notifications'), {
           userId: booking.clientId, message, isRead: false, createdAt: serverTimestamp(), link: `/booking/${bookingId}`
         });
+        toast.success(`Booking status updated to ${newStatus.replace('-', ' ')}.`);
       }
     } catch (error) {
       console.error("Error updating status:", error);
-      alert("Failed to update status.");
+      toast.error("Failed to update status.");
     } finally {
-      setIsUpdating(null); // Clear loading state
+      setIsUpdating(null);
+    }
+  };
+
+  const getVendorUnavailableDates = async (vendorId: string): Promise<string[]> => {
+    try {
+      const docSnap = await getDoc(doc(db, 'vendors', vendorId, 'availability', 'unavailableDates'));
+      return docSnap.exists() ? docSnap.data().dates || [] : [];
+    } catch (error) {
+      console.error("Error fetching vendor unavailable dates:", error);
+      return [];
     }
   };
 
@@ -157,6 +241,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
     if (!vendorId || !booking) return;
     const vendor = vendors.find(v => v.uid === vendorId);
     if (!vendor) return;
+
+    const isAlreadyAssigned = tasks.some(
+      t => t.bookingId === booking.id && t.category === category
+    );
+
+    if (isAlreadyAssigned) {
+      toast.error(`A vendor is already assigned to the ${category} category for this booking.`);
+      return;
+    }
+
+    const vendorUnavailable = await getVendorUnavailableDates(vendorId);
+    const bookingEventDate = formatDate(booking.eventDate);
+    const isBlocked = vendorUnavailable.includes(bookingEventDate);
+
+    if (isBlocked) {
+      toast.error(`${vendor.name} is unavailable on ${bookingEventDate}. Please choose another vendor.`);
+      return;
+    }
 
     try {
       const batch = writeBatch(db);
@@ -174,10 +276,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
         meta: { bookingId: booking.id, vendorName: vendor.name, clientName: booking.clientName }
       });
       await batch.commit();
-      alert(`${vendor.name} has been assigned.`);
+      toast.success(`${vendor.name} has been assigned.`);
     } catch (error) {
       console.error("Error assigning vendor:", error);
-      alert("Failed to assign vendor. Please try again.");
+      toast.error("Failed to assign vendor. Please try again.");
     }
   };
 
@@ -213,9 +315,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
   const formatDate = (dateString: any) => {
     const date = dateString?.seconds ? new Date(dateString.seconds * 1000) : new Date(dateString);
     if (isNaN(date.getTime())) return "Invalid Date";
-    return date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    return date.toISOString().split('T')[0]; // Format to YYYY-MM-DD for comparison
   };
-  
+
   if (loading) return <div className="p-8 text-center">Loading Admin Dashboard...</div>;
 
   return (
@@ -294,6 +396,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
                     );
                   }) : <p className="text-neutral-500 text-center py-8">No bookings match the current filters.</p>}
                 </div>
+                {hasMore && (
+                  <div className="text-center py-4">
+                    <button onClick={loadMoreBookings} className="btn-primary" disabled={isLoadingMore}>
+                      {isLoadingMore ? 'Loading More...' : 'Load More'}
+                    </button>
+                  </div>
+                )}
               </div>
               <ActivityLog />
             </div>
@@ -309,9 +418,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
                     <div>
                       <label className="block text-sm font-medium text-neutral-700 mb-3">Booking Status</label>
                       <div className="space-y-2">{(['pending', 'awaiting-payment', 'confirmed', 'in-progress', 'completed', 'rejected'] as const).map((status) => (
-                        <button 
-                          key={status} 
-                          onClick={() => updateBookingStatus(selectedBooking.id, status)} 
+                        <button
+                          key={status}
+                          onClick={() => updateBookingStatus(selectedBooking.id, status)}
                           className={`w-full p-3 rounded-xl border text-left transition-all ${selectedBooking.status === status ? 'border-primary-300 bg-primary-50 text-primary-700' : 'border-neutral-200 hover:border-primary-200 hover:bg-primary-50'} ${isUpdating === selectedBooking.id ? 'opacity-50 cursor-not-allowed' : ''}`}
                           disabled={isUpdating === selectedBooking.id}
                         >
@@ -339,12 +448,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
                                 {assignedTasks.map(task => (
                                     <p key={task.id} className="text-sm text-neutral-600 mb-1">{task.vendorName}</p>
                                 ))}
-                                <select 
+                                <select
                                     onChange={(e) => {
                                         assignVendor(selectedBooking, e.target.value, category);
                                         e.target.value = "";
-                                    }} 
-                                    className="w-full mt-2 px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500" 
+                                    }}
+                                    className="w-full mt-2 px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
                                     defaultValue=""
                                 >
                                     <option value="">Assign a new vendor...</option>

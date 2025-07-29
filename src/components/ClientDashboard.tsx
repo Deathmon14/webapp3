@@ -5,7 +5,10 @@ import { collection, getDocs, addDoc, serverTimestamp, doc, getDoc, setDoc, quer
 import { db } from '../lib/firebase';
 import { Package, Star, ArrowRight, Check, Image, Users, Heart, Search, Eye, X, Calendar, Briefcase, XCircle, MessageSquare, DollarSign } from 'lucide-react';
 import { User, EventPackage, CustomizationOption, BookingRequest, Review } from '../types';
-import ChatModal from './ChatModal'; // FIX: Re-added the ChatModal import
+import ChatModal from './ChatModal';
+import toast from 'react-hot-toast';
+import { PriceBreakdownModal } from './PriceBreakdownModal';
+import { EmptyState } from './EmptyState'; // Import the new EmptyState component
 
 interface ClientDashboardProps {
   user: User;
@@ -25,9 +28,8 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
   const [view, setView] = useState<'all' | 'saved' | 'bookings'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'default' | 'price-asc' | 'price-desc'>('default');
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false); // FIX: Re-added state for Preview Modal
-  
-  // FIX: Re-added state for Chat Modal
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [selectedBookingForChat, setSelectedBookingForChat] = useState<BookingRequest | null>(null);
 
@@ -37,6 +39,8 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
   const [eventDate, setEventDate] = useState('');
   const [requirements, setRequirements] = useState('');
   const [currentStep, setCurrentStep] = useState<'packages' | 'customize' | 'book'>('packages');
+
+  const [showBreakdown, setShowBreakdown] = useState(false); // New state for Price Breakdown Modal
 
   // --- DATA FETCHING & LOGIC ---
   useEffect(() => {
@@ -50,7 +54,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
 
         const wishlistDoc = await getDoc(doc(db, 'wishlists', user.uid));
         if (wishlistDoc.exists()) setWishlist(wishlistDoc.data().packageIds || []);
-        
+
         const reviewsSnapshot = await getDocs(collection(db, 'reviews'));
         setReviews(reviewsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Review));
 
@@ -70,10 +74,8 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
       setLoading(false);
     });
 
-    // NOTE: This is not scalable for a large number of bookings.
-    // In production, a Cloud Function should update a dedicated 'unavailableDates' collection.
     const allBookingsQuery = query(
-      collection(db, 'bookings'), 
+      collection(db, 'bookings'),
       where('status', 'in', ['confirmed', 'in-progress'])
     );
     const unsubscribeAllBookings = onSnapshot(allBookingsQuery, (snapshot) => {
@@ -84,7 +86,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     });
 
     return () => {
-      unsubscribeUserBookings(); 
+      unsubscribeUserBookings();
       unsubscribeAllBookings();
     };
   }, [user.uid]);
@@ -94,7 +96,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     try {
       const newReviewData = {
         packageId: selectedBookingForReview.packageId,
-        bookingId: selectedBookingForReview.id, 
+        bookingId: selectedBookingForReview.id,
         clientId: user.uid,
         clientName: user.name,
         rating,
@@ -102,19 +104,19 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
         createdAt: serverTimestamp(),
       };
       const docRef = await addDoc(collection(db, 'reviews'), newReviewData);
-      
-      setReviews(prev => [...prev, { 
-        ...newReviewData, 
-        id: docRef.id, 
-        createdAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 } 
+
+      setReviews(prev => [...prev, {
+        ...newReviewData,
+        id: docRef.id,
+        createdAt: { seconds: Math.floor(Date.now() / 1000), nanoseconds: 0 }
       } as Review]);
 
-      alert('Thank you for your review!');
+      toast.success('Thank you for your review!');
       setIsReviewOpen(false);
       setSelectedBookingForReview(null);
     } catch (error) {
       console.error("Error submitting review:", error);
-      alert("Failed to submit review. Please try again.");
+      toast.error("Failed to submit review. Please try again.");
     }
   };
 
@@ -132,7 +134,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     const newWishlist = wishlist.includes(packageId)
       ? wishlist.filter(id => id !== packageId)
       : [...wishlist, packageId];
-    
+
     setWishlist(newWishlist);
 
     try {
@@ -140,12 +142,13 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
       await setDoc(wishlistDocRef, { userId: user.uid, packageIds: newWishlist }, { merge: true });
     } catch (error) {
       console.error("Error updating wishlist: ", error);
-      setWishlist(wishlist); 
-      alert("There was an error updating your wishlist.");
+      setWishlist(wishlist);
+      toast.error("There was an error updating your wishlist.");
     }
   };
 
   const filteredPackages = eventPackages
+    .filter(pkg => !pkg.isArchived) // Filter out archived packages
     .filter(pkg => {
       if (view === 'saved' && !wishlist.includes(pkg.id)) return false;
       if (searchTerm && !pkg.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
@@ -158,7 +161,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
         default: return 0;
       }
     });
-  
+
   const getTotalPrice = () => {
     if (!selectedPackage) return 0;
     const customizationTotal = selectedCustomizations.reduce((sum, option) => {
@@ -182,18 +185,15 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
 
   const handleBooking = async () => {
     if (!selectedPackage || !eventDate) {
-      alert('Please select a package and an event date.');
+      toast.error('Please select a package and an event date.');
       return;
     }
     if (unavailableDates.includes(eventDate)) {
-        alert("The selected date is no longer available. Please choose another date.");
+        toast.error("The selected date is no longer available. Please choose another date.");
         return;
     }
 
-    // A loading state could be set here for better UX
-    
     try {
-      // FIX: This operation is now only responsible for creating the booking.
       await addDoc(collection(db, 'bookings'), {
         clientId: user.uid,
         clientName: user.name,
@@ -208,18 +208,18 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
         guestCount: guestCount,
       });
 
-      alert('Booking request submitted successfully!');
-      
+      toast.success('Booking request submitted successfully! Our team will contact you soon.');
+
       setCurrentStep('packages');
       setView('bookings');
       setSelectedPackage(null);
       setSelectedCustomizations([]);
       setEventDate('');
       setRequirements('');
-
+      setShowBreakdown(false);
     } catch (error) {
       console.error("Error creating booking: ", error);
-      alert('There was an error submitting your booking. Please try again.');
+      toast.error('There was an error submitting your booking. Please try again.');
     }
   };
 
@@ -231,8 +231,8 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     photography: { name: 'Photography', icon: <Image className="w-5 h-5" /> }
   };
 
-  const DatePicker = ({ selectedDate, onDateChange, disabledDates }: { 
-    selectedDate: string, 
+  const DatePicker = ({ selectedDate, onDateChange, disabledDates }: {
+    selectedDate: string,
     onDateChange: (date: string) => void,
     disabledDates: string[]
   }) => {
@@ -243,18 +243,18 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const newDate = e.target.value;
       if (disabledDates.includes(newDate)) {
-        alert("This date is already booked. Please choose another date.");
+        toast.error("This date is already booked. Please choose another date.");
         return;
       }
       onDateChange(newDate);
     };
-    
+
     return (
       <div>
         <label className="block text-sm font-medium text-neutral-700 mb-2">Event Date *</label>
-        <input 
-          type="date" 
-          value={selectedDate} 
+        <input
+          type="date"
+          value={selectedDate}
           onChange={handleDateChange}
           min={minDate}
           className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -264,14 +264,14 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
       </div>
     );
   };
-  
+
   if (loading) {
     return <div className="text-center p-12 text-neutral-600">Loading your dashboard...</div>;
   }
-  
-  const ReviewModal = ({ isOpen, onClose, onSubmit, booking }: { 
-    isOpen: boolean; 
-    onClose: () => void; 
+
+  const ReviewModal = ({ isOpen, onClose, onSubmit, booking }: {
+    isOpen: boolean;
+    onClose: () => void;
     onSubmit: (rating: number, comment: string) => void;
     booking: BookingRequest | null;
   }) => {
@@ -289,7 +289,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
 
     const handleSubmit = () => {
       if (rating === 0) {
-        alert('Please select a star rating.');
+        toast.error('Please select a star rating.');
         return;
       }
       onSubmit(rating, comment);
@@ -383,7 +383,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
                   </ul>
                 </div>
               )}
-              
+
               {booking.requirements && (
                 <div className="mb-4">
                   <h4 className="font-semibold text-neutral-800 text-sm mb-2">Special Requirements:</h4>
@@ -393,7 +393,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
 
               <div className="relative pt-4">
                 <div className="absolute left-4 top-6 h-[calc(100%-2rem)] w-0.5 bg-neutral-200"></div>
-                
+
                 {statuses.map((status, index) => (
                   <div key={status} className="flex items-start mb-6 relative">
                     <div className={`z-10 w-8 h-8 rounded-full flex items-center justify-center ${index <= currentStatusIndex ? 'bg-primary-600' : 'bg-neutral-300'}`}>
@@ -413,12 +413,11 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
             </>
           )}
         </div>
-        
-        {/* --- FIX IS HERE --- */}
+
         <div className="mt-auto pt-4 border-t border-neutral-100 flex flex-col gap-2">
            {isAwaitingPayment && (
             <button
-              onClick={() => alert("Redirecting to payment gateway...")}
+              onClick={() => toast.success("Redirecting to payment gateway...")}
               className="btn-primary w-full bg-gradient-to-r from-success-600 to-green-500"
             >
               <DollarSign className="w-4 h-4 mr-2" />
@@ -426,8 +425,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
             </button>
           )}
 
-          {/* This is the button that was missing */}
-          <button 
+          <button
             onClick={() => {
               setSelectedBookingForChat(booking);
               setIsChatOpen(true);
@@ -464,13 +462,12 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
       </div>
     );
   };
-  
+
   if (currentStep === 'packages') {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* FIX: Re-added the ChatModal component to the render output */}
         {isChatOpen && selectedBookingForChat && (
-          <ChatModal 
+          <ChatModal
             isOpen={isChatOpen}
             onClose={() => setIsChatOpen(false)}
             booking={selectedBookingForChat}
@@ -478,25 +475,25 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
           />
         )}
 
-        <ReviewModal 
-          isOpen={isReviewOpen} 
-          onClose={() => setIsReviewOpen(false)} 
-          onSubmit={handleReviewSubmit} 
-          booking={selectedBookingForReview} 
+        <ReviewModal
+          isOpen={isReviewOpen}
+          onClose={() => setIsReviewOpen(false)}
+          onSubmit={handleReviewSubmit}
+          booking={selectedBookingForReview}
         />
-        
+
         <div className="text-center mb-12">
           <h2 className="text-4xl font-bold text-neutral-900 mb-4">Welcome back, {user.name}!</h2>
           <p className="text-xl text-neutral-600 max-w-3xl mx-auto">
             Choose from our curated event packages or customize your own perfect celebration.
           </p>
         </div>
-        
+
         <div className="mb-8 p-4 bg-white/50 rounded-2xl shadow-md border border-neutral-200">
           <div className="grid md:grid-cols-3 gap-4 items-center">
             <div className="relative md:col-span-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-              <input 
+              <input
                 type="text"
                 placeholder="Search for packages..."
                 value={searchTerm}
@@ -558,7 +555,7 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
                     </div>
                     <div className="p-6">
                       <h3 className="text-xl font-bold text-neutral-900 mb-2">{pkg.name}</h3>
-                      
+
                       <div className="flex items-center mb-3">
                         <div className="flex">
                           {[...Array(5)].map((_, i) => (
@@ -592,24 +589,19 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
               })}
             </div>
           ) : (
-            <div className="text-center py-16">
-              <h3 className="text-xl font-semibold text-neutral-800">No Packages Found</h3>
-              <p className="text-neutral-500 mt-2">Try adjusting your filters or save some packages!</p>
-            </div>
+            // Empty state for Packages/Wishlist
+            <EmptyState
+              variant={view === 'saved' ? 'wishlist' : 'packages'}
+              onAction={() => setView('all')}
+            />
           )
         ) : (
           <div className="grid md:grid-cols-2 gap-8">
             {bookings.length > 0 ? (
               bookings.map(booking => <BookingStatusTracker key={booking.id} booking={booking} />)
             ) : (
-              <div className="md:col-span-2 text-center py-16 animate-fade-in-up">
-                <Briefcase className="w-16 h-16 mx-auto text-neutral-400 mb-4" />
-                <h3 className="text-xl font-semibold text-neutral-800">No Bookings Yet</h3>
-                <p className="text-neutral-500 mt-2">Your booked events will appear here. Start planning your next celebration!</p>
-                <button onClick={() => setView('all')} className="btn-primary mt-6">
-                  Browse Packages
-                </button>
-              </div>
+              // Empty state for My Bookings
+              <EmptyState variant="bookings" onAction={() => setView('all')} />
             )}
           </div>
         )}
@@ -732,9 +724,9 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
             <div className="text-2xl font-bold text-neutral-900">${getTotalPrice().toLocaleString()}</div>
           </div>
           <div className="flex gap-4">
-            <button 
-              onClick={() => setIsPreviewOpen(true)} 
-              disabled={selectedCustomizations.length === 0} 
+            <button
+              onClick={() => setIsPreviewOpen(true)}
+              disabled={selectedCustomizations.length === 0}
               className="px-6 py-3 border border-neutral-300 text-neutral-700 rounded-xl font-medium hover:bg-neutral-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               <Eye className="w-4 h-4" />
@@ -819,12 +811,30 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
                 <li>• Payment options will be provided upon confirmation</li>
               </ul>
             </div>
-            <button onClick={handleBooking} disabled={!eventDate || unavailableDates.includes(eventDate)} className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 text-white px-6 py-4 rounded-xl font-medium hover:from-primary-700 hover:to-secondary-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
-              Submit Booking Request
+            <button
+              onClick={() => setShowBreakdown(true)}
+              disabled={!eventDate || unavailableDates.includes(eventDate)}
+              className="w-full bg-gradient-to-r from-primary-600 to-secondary-600 text-white px-6 py-4 rounded-xl font-medium hover:from-primary-700 hover:to-secondary-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Review & Confirm
             </button>
           </div>
         </div>
       </div>
+      {selectedPackage && (
+        <PriceBreakdownModal
+          isOpen={showBreakdown}
+          onClose={handleBooking}
+          basePrice={selectedPackage.basePrice}
+          customizations={selectedCustomizations.map(c => ({
+            name: c.name,
+            price: c.price,
+            category: c.category
+          }))}
+          guestCount={guestCount}
+          total={getTotalPrice()}
+        />
+      )}
     </div>
   );
 };

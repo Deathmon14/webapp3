@@ -5,6 +5,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { CustomizationOption } from '../types';
 import { Edit } from 'lucide-react';
+import toast from 'react-hot-toast'; // Import toast
 
 interface EditOptionFormProps {
   option: CustomizationOption;
@@ -42,6 +43,7 @@ const EditCustomizationOptionForm: React.FC<EditOptionFormProps> = ({ option, on
     e.preventDefault();
     if (!formData.name || !formData.price || !formData.category) {
       setMessage('Please fill in all required fields.');
+      toast.error('Please fill in all required fields.'); // Replaced alert
       return;
     }
     setLoading(true);
@@ -58,10 +60,12 @@ const EditCustomizationOptionForm: React.FC<EditOptionFormProps> = ({ option, on
       });
 
       setMessage('Option updated successfully!');
+      toast.success('Option updated successfully!'); // Replaced alert
       onUpdate();
     } catch (error) {
       console.error("Error updating option:", error);
       setMessage('Failed to update option. Please try again.');
+      toast.error('Failed to update option. Please try again.'); // Replaced alert
     } finally {
       setLoading(false);
     }
@@ -94,7 +98,7 @@ const EditCustomizationOptionForm: React.FC<EditOptionFormProps> = ({ option, on
             <textarea name="description" value={formData.description} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" rows={2}></textarea>
           </div>
         </div>
-        
+
         <div className="space-y-4">
            <div>
             <label className="block text-sm font-medium text-gray-700">Price ($) *</label>
@@ -105,7 +109,7 @@ const EditCustomizationOptionForm: React.FC<EditOptionFormProps> = ({ option, on
             <input type="url" name="image" value={formData.image} onChange={handleChange} className="mt-1 w-full p-2 border rounded-md" placeholder="https://example.com/image.jpg" />
           </div>
         </div>
-        
+
         <div className="md:col-span-2 flex items-center gap-4">
           <button type="button" onClick={onCancel} className="w-full bg-gray-500 text-white py-3 px-4 rounded-lg font-medium hover:bg-gray-600 transition">
             Cancel

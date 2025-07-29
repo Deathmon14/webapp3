@@ -5,6 +5,7 @@ import { collection, onSnapshot, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { CustomizationOption } from '../types';
 import { Trash2, Edit } from 'lucide-react';
+import toast from 'react-hot-toast'; // Import toast
 
 interface CustomizationOptionListProps {
   onEdit: (option: CustomizationOption) => void;
@@ -25,12 +26,12 @@ const CustomizationOptionList: React.FC<CustomizationOptionListProps> = ({ onEdi
   }, []);
 
   const handleDelete = async (optionId: string) => {
-    if (window.confirm('Are you sure you want to delete this option?')) {
+    if (window.confirm('Are you sure you want to delete this option?')) { // Kept confirm for critical action
       try {
         await deleteDoc(doc(db, 'customizationOptions', optionId));
-        alert('Option deleted successfully.');
+        toast.success('Option deleted successfully.'); // Replaced alert
       } catch (err) {
-        alert('Failed to delete option.');
+        toast.error('Failed to delete option.'); // Replaced alert
       }
     }
   };

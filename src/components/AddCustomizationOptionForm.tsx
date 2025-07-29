@@ -5,6 +5,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { PlusCircle } from 'lucide-react';
 import { CustomizationOption } from '../types';
+import toast from 'react-hot-toast'; // Import toast
 
 const AddCustomizationOptionForm = () => {
   const [optionName, setOptionName] = useState('');
@@ -19,6 +20,7 @@ const AddCustomizationOptionForm = () => {
     e.preventDefault();
     if (!optionName || !price || !category) {
       setMessage('Please fill in all required fields.');
+      toast.error('Please fill in all required fields.'); // Replaced alert
       return;
     }
     setLoading(true);
@@ -34,6 +36,7 @@ const AddCustomizationOptionForm = () => {
       });
 
       setMessage('New option added successfully!');
+      toast.success('New option added successfully!'); // Replaced alert
       // Reset form
       setOptionName('');
       setDescription('');
@@ -43,6 +46,7 @@ const AddCustomizationOptionForm = () => {
     } catch (error) {
       console.error("Error adding customization option:", error);
       setMessage('Failed to add option. Please try again.');
+      toast.error('Failed to add option. Please try again.'); // Replaced alert
     } finally {
       setLoading(false);
     }
@@ -75,7 +79,7 @@ const AddCustomizationOptionForm = () => {
             <textarea value={description} onChange={e => setDescription(e.target.value)} className="mt-1 w-full p-2 border rounded-md" rows={2}></textarea>
           </div>
         </div>
-        
+
         <div className="space-y-4">
            <div>
             <label className="block text-sm font-medium text-gray-700">Price ($) *</label>
@@ -86,7 +90,7 @@ const AddCustomizationOptionForm = () => {
             <input type="url" value={imageUrl} onChange={e => setImageUrl(e.target.value)} className="mt-1 w-full p-2 border rounded-md" placeholder="https://example.com/image.jpg" />
           </div>
         </div>
-        
+
         <div className="md:col-span-2">
           <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50">
             {loading ? 'Adding...' : 'Add Option'}
