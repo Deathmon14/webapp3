@@ -1,8 +1,10 @@
+// src/components/AdminDashboard.tsx
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, where, doc, updateDoc, addDoc, serverTimestamp, writeBatch, getDoc, orderBy, limit, startAfter, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import {
-  LayoutDashboard, Calendar, Users, Package, BarChart2, MessageSquare, Settings, XCircle, Search, Download, CheckCircle, Clock, DollarSign, UserCheck, ArrowRight
+  LayoutDashboard, Calendar, Users, Package, BarChart2, MessageSquare, Settings, XCircle, Search, Download, CheckCircle, Clock, DollarSign, UserCheck, ArrowRight, Loader // Import Loader
 } from 'lucide-react';
 import { User, BookingRequest, VendorTask, Review, EventPackage } from '../types';
 import CatalogManager from './CatalogManager';
@@ -35,7 +37,6 @@ const AdminSidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiv
           key={item.id}
           onClick={() => setActiveTab(item.id)}
           className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ${
-            // --- CHANGE 1: Improved active state for sidebar ---
             activeTab === item.id
               ? 'bg-primary-100 text-primary-800 shadow-inner'
               : 'text-neutral-600 hover:bg-white/70 hover:text-primary-600'
@@ -49,25 +50,19 @@ const AdminSidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiv
   );
 };
 
-// New component for just the bookings view to keep the main component clean
-const BookingsView = ({
-  bookings, tasks, vendors, reviews, selectedBooking, setSelectedBooking,
-  searchTerm, setSearchTerm, statusFilter, setStatusFilter, isUpdating,
-  updateBookingStatus, assignVendor, getRequiredCategories, getStatusIcon,
-  getStatusColor, formatDate, handleExportCSV, loadMoreBookings, hasMore,
-  isLoadingMore, stats, currentUser
-}: {
+// Bookings View with the fix applied
+const BookingsView = ({ bookings, tasks, vendors, selectedBooking, setSelectedBooking, reviews, statusFilter, setSearchTerm, setStatusFilter, handleExportCSV, loadMoreBookings, hasMore, isLoadingMore, filteredBookings, stats, updateBookingStatus, assignVendor, getRequiredCategories, getStatusIcon, getStatusColor, formatDate, searchTerm, currentUser, isUpdating }: {
   bookings: BookingRequest[];
   tasks: VendorTask[];
   vendors: User[];
-  reviews: Review[];
+  reviews: Review[]; // Added reviews prop
   selectedBooking: BookingRequest | null;
   setSelectedBooking: (booking: BookingRequest | null) => void;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   statusFilter: 'all' | BookingRequest['status'];
   setStatusFilter: (status: 'all' | BookingRequest['status']) => void;
-  isUpdating: string | null;
+  isUpdating: string | null; // Added isUpdating prop
   updateBookingStatus: (bookingId: string, newStatus: BookingRequest['status']) => Promise<void>;
   assignVendor: (booking: BookingRequest, vendorId: string, category: string) => Promise<void>;
   getRequiredCategories: (booking: BookingRequest | null) => string[];
@@ -86,15 +81,27 @@ const BookingsView = ({
   };
   currentUser: User;
 }) => {
-  const filteredBookings = useMemo(() => {
+
+  const getTaskStatusIcon = (status: VendorTask['status']) => {
+    switch (status) {
+      case 'assigned': return <Clock className="w-4 h-4 text-orange-600" />;
+      case 'in-progress': return <Loader className="w-4 h-4 text-blue-600 animate-spin" />;
+      case 'completed': return <CheckCircle className="w-4 h-4 text-green-600" />;
+      default: return <Clock className="w-4 h-4 text-neutral-500" />;
+    }
+  };
+
+  // Memoize filtered bookings to prevent unnecessary re-renders
+  const filteredBookingsMemo = useMemo(() => {
     return bookings.filter(booking => {
       const searchTermLower = searchTerm.toLowerCase();
       const matchesSearch = searchTerm === '' ||
         booking.clientName.toLowerCase().includes(searchTermLower) ||
         booking.packageName.toLowerCase().includes(searchTermLower);
-      return matchesSearch;
+      const matchesStatus = statusFilter === 'all' || booking.status === statusFilter;
+      return matchesSearch && matchesStatus;
     });
-  }, [bookings, searchTerm]);
+  }, [bookings, searchTerm, statusFilter]);
 
   return (
     <>
@@ -174,7 +181,6 @@ const BookingsView = ({
                     key={status}
                     onClick={() => setStatusFilter(status)}
                     className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
-                      // --- CHANGE 2: Improved active state for filters ---
                       statusFilter === status
                         ? 'bg-primary-100 text-primary-800 ring-2 ring-primary-200'
                         : 'bg-neutral-200 text-neutral-700 hover:bg-neutral-300'
@@ -186,7 +192,7 @@ const BookingsView = ({
               </div>
             </div>
             <div className="space-y-4">
-              {filteredBookings.length > 0 ? filteredBookings.map((booking) => {
+              {filteredBookingsMemo.length > 0 ? filteredBookingsMemo.map((booking) => {
                 const assignedCount = tasks.filter(t => t.bookingId === booking.id).length;
                 return (
                   <div
@@ -277,10 +283,15 @@ const BookingsView = ({
                         <div key={category} className="border border-neutral-200 rounded-xl p-4">
                             <div className="flex items-center justify-between mb-2">
                                 <span className="font-medium text-neutral-900 capitalize">{category}</span>
-                                {assignedTasks.length > 0 && <span className="px-2 py-1 bg-success-100 text-success-700 rounded-full text-xs font-medium">{assignedTasks.length} Assigned</span>}
+                                {assignedTasks.length > 0 && (
+                                  <div className="flex items-center gap-2 px-2 py-1 bg-neutral-100 text-neutral-700 rounded-full text-xs font-medium">
+                                    {getTaskStatusIcon(assignedTasks[0].status)} {/* Assuming one task per category for simplicity */}
+                                    <span>{assignedTasks[0].status.replace('-', ' ')}</span>
+                                  </div>
+                                )}
                             </div>
                             {assignedTasks.map(task => (
-                                <p key={task.id} className="text-sm text-neutral-600 mb-1">{task.vendorName}</p>
+                                <p key={task.id} className="text-sm text-neutral-600 mb-1">Assigned to: <span className="font-semibold">{task.vendorName}</span></p>
                             ))}
                             <select
                                 onChange={(e) => {
@@ -290,7 +301,7 @@ const BookingsView = ({
                                 className="w-full mt-2 px-3 py-2 border border-neutral-300 rounded-lg text-sm focus:ring-primary-500 focus:border-primary-500"
                                 defaultValue=""
                             >
-                                <option value="">Assign a new vendor...</option>
+                                <option value="">Assign a vendor...</option>
                                 {vendors.map((vendor) => (<option key={vendor.uid} value={vendor.uid}>{vendor.name}</option>))}
                             </select>
                         </div>
@@ -620,16 +631,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user }) => {
             bookings={bookings}
             tasks={tasks}
             vendors={vendors}
-            reviews={reviews}
             selectedBooking={selectedBooking}
             setSelectedBooking={setSelectedBooking}
+            reviews={reviews}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
             statusFilter={statusFilter}
             setStatusFilter={setStatusFilter}
-            isUpdating={isUpdating}
-            updateBookingStatus={updateBookingStatus}
-            assignVendor={assignVendor}
+            isUpdating={isUpdating} // Pass isUpdating state
+            updateBookingStatus={updateBookingStatus} // Pass handler
+            assignVendor={assignVendor} // Pass handler
             getRequiredCategories={getRequiredCategories}
             getStatusIcon={getStatusIcon}
             getStatusColor={getStatusColor}
