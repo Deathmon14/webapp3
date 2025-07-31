@@ -1,11 +1,10 @@
-// src/App.tsx
-
 import React, { useState, useEffect } from 'react';
-import { User, Calendar, Package, Settings, LogOut, Menu, X, Bell, ShieldCheck } from 'lucide-react';
+import { User as UserIcon, Calendar, Package, Settings, LogOut, Menu, X, Bell, ShieldCheck } from 'lucide-react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, orderBy, onSnapshot, updateDoc } from 'firebase/firestore';
 import { auth, db } from './lib/firebase';
 import LoginPage from './components/LoginPage';
+import LandingPage from './components/LandingPage';
 import ClientDashboard from './components/ClientDashboard';
 import VendorDashboard from './components/VendorDashboard';
 import AdminDashboard from './components/AdminDashboard';
@@ -19,6 +18,17 @@ function App() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const { theme, setTheme } = useTheme();
+  const [showLoginPage, setShowLoginPage] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false); // Added for scroll effect
+
+  // Effect for handling scroll to apply header shadow
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -107,13 +117,17 @@ function App() {
       case 'admin':
         return <ShieldCheck className="w-5 h-5" />;
       default:
-        return <User className="w-5 h-5" />;
+        return <UserIcon className="w-5 h-5" />;
     }
   };
 
   const renderDashboard = () => {
+    if (showLoginPage) {
+      return <LoginPage onLogin={() => setShowLoginPage(false)} />;
+    }
+
     if (!currentUser) {
-       return <LoginPage onLogin={setCurrentUser} />;
+      return <LandingPage onLoginClick={() => setShowLoginPage(true)} />;
     }
 
     switch (currentUser.role) {
@@ -153,7 +167,8 @@ function App() {
 
   return (
     <div className={`theme-${theme} min-h-screen bg-gradient-to-br from-primary-50 via-secondary-50 to-accent-50`}>
-      <header className="bg-surface/80 backdrop-blur-lg border-b border-white/30 sticky top-0 z-50">
+     {currentUser && (
+      <header className={`sticky top-0 z-50 transition-shadow duration-300 ${isScrolled ? 'shadow-lg bg-surface/80 backdrop-blur-lg border-b border-white/30' : ''}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
@@ -252,6 +267,7 @@ function App() {
           )}
         </div>
       </header>
+       )}
       <main className="flex-1">
         {renderDashboard()}
       </main>
