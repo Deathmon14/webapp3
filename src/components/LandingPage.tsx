@@ -1,7 +1,7 @@
 import React from 'react';
-import { Calendar, ShieldCheck, Users, Briefcase, Star } from 'lucide-react';
+import { Calendar, ShieldCheck, Users, Briefcase, Star, Workflow } from 'lucide-react';
 import Lottie from 'lottie-react';
-import animationData from '../assets/animation.json'; // You'll need to add a Lottie JSON file to your assets
+import animationData from '../assets/animation.json';
 
 interface LandingPageProps {
   onLoginClick: () => void;
@@ -22,7 +22,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick }) => {
           <div className="flex lg:flex-1 lg:justify-end">
             <button
               onClick={onLoginClick}
-              className="text-sm font-semibold leading-6 text-gray-900"
+              className="text-sm font-semibold leading-6 text-purple-700 hover:text-purple-900 transition"
             >
               Log in <span aria-hidden="true">&rarr;</span>
             </button>
@@ -32,112 +32,118 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLoginClick }) => {
 
       <main>
         {/* Hero section */}
-        <div className="relative isolate overflow-hidden bg-gradient-to-b from-purple-100/20 pt-14">
-          <div className="absolute inset-y-0 right-1/2 -z-10 -mr-96 w-[200%] origin-top-right skew-x-[-30deg] bg-white shadow-xl shadow-purple-600/10 ring-1 ring-purple-50 sm:mr-20 lg:mr-0 xl:mr-16 xl:origin-center"></div>
+        <div className="relative isolate overflow-hidden bg-gradient-to-b from-purple-50/30 pt-14">
+          <div className="absolute inset-y-0 right-1/2 -z-10 -mr-96 w-[200%] origin-top-right skew-x-[-30deg] bg-white shadow-xl shadow-purple-600/10 ring-1 ring-purple-50"></div>
           <div className="mx-auto max-w-7xl px-6 py-32 sm:py-40 lg:px-8">
-            <div className="mx-auto max-w-2xl lg:mx-0 lg:grid lg:max-w-none lg:grid-cols-2 lg:gap-x-16 lg:gap-y-6 xl:grid-cols-1 xl:grid-rows-1 xl:gap-x-8">
-              <h1 className="max-w-2xl text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl lg:col-span-2 xl:col-auto animate-fade-in-up">
-                Book it. Forget it. Flaunt it.
+            <div className="lg:grid lg:grid-cols-2 lg:gap-x-16">
+              <h1 className="max-w-2xl text-4xl font-extrabold tracking-tight text-gray-900 sm:text-6xl animate-fade-in-up">
+                Your Event. Our Technology. Seamlessly Managed.
               </h1>
-              <div className="mt-6 max-w-xl lg:mt-0 xl:col-end-1 xl:row-start-1 animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
-                <p className="text-lg leading-8 text-gray-600">
-                  KAISRI is your all-in-one event management platform, designed to streamline planning, coordination, and execution. Whether you are a client, a vendor, or an admin, we have the tools to make your event a success.
+              <div className="mt-6 max-w-xl animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+                <p className="text-lg leading-8 text-gray-700">
+                  KAISRI combines cutting-edge technology with personalized coordination. 
+                  Book your event in minutes while we handle vendor management and flawless execution.
                 </p>
                 <div className="mt-10 flex items-center gap-x-6">
                   <button
                     onClick={onLoginClick}
-                    className="btn-3d"
+                    className="px-6 py-3 rounded-xl bg-purple-600 text-white font-semibold shadow-md hover:bg-purple-700 hover:scale-105 transition-all"
                   >
-                    Get started
+                    Get Started
                   </button>
                 </div>
               </div>
-              <div className="mt-10 w-full max-w-lg sm:mt-16 lg:mt-0 lg:max-w-none xl:row-span-2 xl:row-end-2 xl:mt-36">
+              <div className="mt-10 w-full max-w-lg sm:mt-16 lg:mt-0 lg:max-w-none">
                 <Lottie animationData={animationData} loop={true} />
               </div>
             </div>
           </div>
         </div>
 
-        {/* Feature section */}
-        <div className="mx-auto mt-32 max-w-7xl px-6 sm:mt-56 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-base font-semibold leading-7 text-purple-600">Everything you need</h2>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
-              A platform for every role
-            </p>
-            <p className="mt-6 text-lg leading-8 text-gray-600">
-              KAISRI provides tailored dashboards for clients, vendors, and administrators to ensure a seamless event management experience for everyone involved.
-            </p>
-          </div>
-          <div className="mx-auto mt-16 max-w-2xl sm:mt-20 lg:mt-24 lg:max-w-none">
-            <dl className="grid max-w-xl grid-cols-1 gap-x-8 gap-y-16 lg:max-w-none lg:grid-cols-3">
-              <div className="flex flex-col card-modern hover-scale">
-                <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
-                  <Users className="h-5 w-5 flex-none text-purple-600" aria-hidden="true" />
-                  For Clients
-                </dt>
-                <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
-                  <p className="flex-auto">Browse and book event packages, customize your event with a variety of vendors, and manage all your bookings in one place.</p>
-                </dd>
-              </div>
-              <div className="flex flex-col card-modern hover-scale">
-                <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
-                  <Briefcase className="h-5 w-5 flex-none text-purple-600" aria-hidden="true" />
-                  For Vendors
-                </dt>
-                <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
-                  <p className="flex-auto">Manage your assigned tasks, track your progress, and communicate with clients and administrators to deliver top-quality services.</p>
-                </dd>
-              </div>
-              <div className="flex flex-col card-modern hover-scale">
-                <dt className="flex items-center gap-x-3 text-base font-semibold leading-7 text-gray-900">
-                  <ShieldCheck className="h-5 w-5 flex-none text-purple-600" aria-hidden="true" />
-                  For Admins
-                </dt>
-                <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600">
-                  <p className="flex-auto">Oversee all bookings, manage users and vendors, and ensure the smooth operation of all events on the platform.</p>
-                </dd>
-              </div>
-            </dl>
+        {/* How it Works Section */}
+        <div className="mx-auto mt-24 max-w-7xl px-6 lg:px-8 text-center">
+          <h2 className="text-base font-semibold leading-7 text-purple-600">How KAISRI Works</h2>
+          <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+            Simple 3-Step Process
+          </p>
+          <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
+            From booking to celebration, we make event management effortless with a clear workflow.
+          </p>
+          <div className="mt-10 grid grid-cols-1 gap-8 sm:grid-cols-3">
+            <div className="p-6 rounded-2xl bg-purple-50 shadow hover:shadow-lg transition">
+              <Users className="mx-auto h-10 w-10 text-purple-600" />
+              <h3 className="mt-4 text-lg font-semibold">Client Books</h3>
+              <p className="mt-2 text-gray-600">Clients select packages, customize, and make secure payments through KAISRI.</p>
+            </div>
+            <div className="p-6 rounded-2xl bg-purple-50 shadow hover:shadow-lg transition">
+              <ShieldCheck className="mx-auto h-10 w-10 text-purple-600" />
+              <h3 className="mt-4 text-lg font-semibold">Admin Manages</h3>
+              <p className="mt-2 text-gray-600">KAISRI Admin confirms bookings, coordinates vendors, and tracks progress.</p>
+            </div>
+            <div className="p-6 rounded-2xl bg-purple-50 shadow hover:shadow-lg transition">
+              <Briefcase className="mx-auto h-10 w-10 text-purple-600" />
+              <h3 className="mt-4 text-lg font-semibold">Vendors Execute</h3>
+              <p className="mt-2 text-gray-600">Vendors deliver quality services under KAISRI’s supervision for a flawless event.</p>
+            </div>
           </div>
         </div>
 
-        {/* Testimonial section */}
-        <div className="mx-auto mt-32 max-w-7xl sm:mt-56 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden bg-gray-900 px-6 py-20 shadow-xl sm:rounded-3xl sm:px-10 sm:py-24 md:px-12 lg:px-20 hover-scale">
-            <img
-              className="absolute inset-0 h-full w-full object-cover brightness-150 saturate-0"
-              src="https://images.pexels.com/photos/2263436/pexels-photo-2263436.jpeg"
-              alt=""
-            />
-            <div className="absolute inset-0 bg-gray-900/90 mix-blend-multiply"></div>
-            <div className="relative mx-auto max-w-2xl lg:mx-0">
-              <div className="flex">
+        {/* Feature section */}
+        <div className="mx-auto mt-32 max-w-7xl px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="text-base font-semibold leading-7 text-purple-600">Everything You Need</h2>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+              Technology + Service = Hassle-Free Events
+            </p>
+            <p className="mt-6 text-lg leading-8 text-gray-600">
+              KAISRI is not just a booking app—it’s your event partner, combining tech efficiency with real-world coordination.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-16">
+            <div className="card-modern hover-scale">
+              <Users className="h-5 w-5 text-purple-600" />
+              <h3 className="mt-4 font-semibold">For Clients</h3>
+              <p className="text-gray-600 mt-2">Book your event with ease while KAISRI handles all backend coordination.</p>
+            </div>
+            <div className="card-modern hover-scale">
+              <Briefcase className="h-5 w-5 text-purple-600" />
+              <h3 className="mt-4 font-semibold">For Vendors</h3>
+              <p className="text-gray-600 mt-2">Get tasks directly from KAISRI, focus on delivery, and receive secure payments.</p>
+            </div>
+            <div className="card-modern hover-scale">
+              <ShieldCheck className="h-5 w-5 text-purple-600" />
+              <h3 className="mt-4 font-semibold">For Admins</h3>
+              <p className="text-gray-600 mt-2">Oversee every event, confirm bookings, and ensure perfect execution.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Testimonial */}
+        <div className="mx-auto mt-32 max-w-7xl sm:px-6 lg:px-8">
+          <div className="relative overflow-hidden bg-gray-900 px-6 py-20 shadow-xl sm:rounded-3xl">
+            <div className="absolute inset-0 bg-gray-900/80"></div>
+            <div className="relative max-w-2xl mx-auto text-center">
+              <div className="flex justify-center mb-4">
                 {[...Array(5)].map((_, i) => (
                   <Star key={i} className="h-5 w-5 text-yellow-400" fill="currentColor" />
                 ))}
               </div>
-              <figure>
-                <blockquote className="mt-6 text-lg font-semibold text-white sm:text-xl sm:leading-8">
-                  <p>
-                    “KAISRI made planning our wedding a breeze. We were able to find the perfect vendors and customize everything to our liking. The platform is intuitive and easy to use, and the support team is fantastic.”
-                  </p>
-                </blockquote>
-                <figcaption className="mt-6 text-base text-white">
-                  <div className="font-semibold">Aisha Khan</div>
-                  <div className="mt-1">Client</div>
-                </figcaption>
-              </figure>
+              <blockquote className="text-white text-lg font-semibold">
+                “KAISRI handled everything—from vendor selection to final execution. 
+                 All we did was book and relax. Truly hassle-free!”
+              </blockquote>
+              <figcaption className="mt-4 text-white">
+                <strong>Rahul Mehta</strong> – Corporate Client
+              </figcaption>
             </div>
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="mx-auto mt-32 max-w-7xl overflow-hidden px-6 pb-20 sm:mt-56 sm:pb-24 lg:px-8">
-        <p className="mt-10 text-center text-xs leading-5 text-gray-500">
-          &copy; {new Date().getFullYear()} KAISRI, Inc. All rights reserved.
+      <footer className="mx-auto mt-32 max-w-7xl px-6 pb-10 text-center">
+        <p className="text-xs text-gray-500">
+          &copy; {new Date().getFullYear()} KAISRI Technologies. All rights reserved.  
         </p>
       </footer>
     </div>

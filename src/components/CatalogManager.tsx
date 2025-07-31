@@ -34,7 +34,7 @@ const CatalogManager: React.FC = () => {
   };
 
   return (
-    <div className="mt-8 bg-white rounded-2xl shadow-lg p-6">
+    <div className="card-modern mt-0 animate-fade-in-up">
       <h3 className="text-xl font-bold text-gray-900 mb-2">Catalog Management</h3>
       
       {/* --- Package Management --- */}

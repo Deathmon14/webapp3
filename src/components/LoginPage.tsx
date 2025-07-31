@@ -6,7 +6,7 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'fire
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { User } from '../types';
-import toast from 'react-hot-toast'; // Import toast
+import toast from 'react-hot-toast';
 
 interface LoginPageProps {
   onLogin: (user: User) => void;
@@ -47,7 +47,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
         if (userData.status === 'pending') {
           setError('Your account is pending approval from an administrator. Please check back later.');
-          toast.error('Your account is pending approval from an administrator. Please check back later.'); // Replaced alert
+          toast.error('Your account is pending approval.');
           await auth.signOut();
           setLoading(false);
           return;
@@ -61,15 +61,15 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           status: userData.status
         };
         onLogin(userObject);
-        toast.success(`Welcome back, ${userData.name}!`); // Added toast for successful login
+        toast.success(`Welcome back, ${userData.name}!`);
       } else {
         setError('User profile not found. Please contact support.');
-        toast.error('User profile not found. Please contact support.'); // Replaced alert
+        toast.error('User profile not found.');
       }
     } catch (error: any) {
       console.error('Login error:', error);
       setError(error.message || 'Failed to log in. Please check your credentials.');
-      toast.error(error.message || 'Failed to log in. Please check your credentials.'); // Replaced alert
+      toast.error(error.message || 'Failed to log in.');
     } finally {
       setLoading(false);
     }
@@ -83,7 +83,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
     if (!formData.name.trim()) {
       setError('Please enter your full name.');
-      toast.error('Please enter your full name.'); // Replaced alert
+      toast.error('Please enter your full name.');
       setLoading(false);
       return;
     }
@@ -110,7 +110,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
         setSignupSuccess(true);
         setIsLogin(true);
         setFormData({ name: '', email: '', password: '', role: 'client' });
-        toast.success('Vendor account created! Pending admin approval.'); // Added toast for vendor signup success
+        toast.success('Vendor account created! Pending admin approval.');
       } else {
         const userObject: User = {
           uid: user.uid,
@@ -120,13 +120,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           status: 'active'
         };
         onLogin(userObject);
-        toast.success(`Welcome, ${userData.name}! Your client account is ready.`); // Added toast for client signup success
+        toast.success(`Welcome, ${userData.name}! Your client account is ready.`);
       }
 
     } catch (error: any) {
       console.error('Signup error:', error);
       setError(error.message || 'Failed to create account. Please try again.');
-      toast.error(error.message || 'Failed to create account. Please try again.'); // Replaced alert
+      toast.error(error.message || 'Failed to create account.');
     } finally {
       setLoading(false);
     }
@@ -148,26 +148,36 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-neutral-50 flex items-center justify-center p-4">
-      <div className="max-w-md w-full">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center space-x-3 mb-6">
-            <div className="w-12 h-12 bg-gradient-to-r from-primary-600 to-secondary-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Calendar className="w-7 h-7 text-white" />
+    <div className="min-h-screen bg-surface flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl grid md:grid-cols-2 shadow-2xl rounded-3xl overflow-hidden">
+        {/* Branding Panel */}
+        <div className="hidden md:flex flex-col justify-between p-8 bg-gradient-to-br from-primary-600 to-secondary-500 text-white">
+          <div>
+            <div className="flex items-center space-x-2">
+              <Calendar className="w-8 h-8" />
+              <span className="text-2xl font-bold">KAISRI</span>
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary-600 to-secondary-600 bg-clip-text text-transparent">
-              KAISRI
-            </h1>
+            <h2 className="text-4xl font-bold mt-8">
+              Book it. Forget it. <br /> Flaunt it.
+            </h2>
+            <p className="mt-4 text-primary-100">
+              Your seamless event experience starts here.
+            </p>
           </div>
-          <p className="text-xl text-neutral-700">
-            {isLogin ? 'Welcome back!' : 'Create your account'}
-          </p>
-          <p className="text-neutral-500 mt-2">
-            Book it. Forget it. Flaunt it.
-          </p>
+          <div className="text-sm text-primary-200">
+            &copy; {new Date().getFullYear()} KAISRI, Inc. All rights reserved.
+          </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-card p-8">
+        {/* Form Panel */}
+        <div className="bg-white p-8">
+          <h2 className="text-2xl font-bold text-neutral-900 mb-2">
+            {isLogin ? 'Welcome Back!' : 'Create Your Account'}
+          </h2>
+          <p className="text-neutral-600 mb-6">
+            {isLogin ? 'Sign in to continue to your dashboard.' : 'Join us to start planning.'}
+          </p>
+
           {signupSuccess && (
             <div className="bg-success-50 border border-success-200 rounded-xl p-4 mb-6">
               <p className="text-success-800 text-sm font-medium">

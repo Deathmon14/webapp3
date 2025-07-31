@@ -1,18 +1,155 @@
 // src/components/ClientDashboard.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs, addDoc, serverTimestamp, doc, getDoc, setDoc, query, where, orderBy, onSnapshot, writeBatch } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Package, Star, ArrowRight, Check, Image, Users, Heart, Search, Eye, X, Calendar, Briefcase, XCircle, MessageSquare, DollarSign } from 'lucide-react';
+import { Package, Star, ArrowRight, Check, Image, Users, Heart, Search, Eye, X, Calendar, Briefcase, XCircle, MessageSquare, DollarSign, Loader } from 'lucide-react'; // Changed LoaderCircle to Loader
 import { User, EventPackage, CustomizationOption, BookingRequest, Review } from '../types';
 import ChatModal from './ChatModal';
 import toast from 'react-hot-toast';
 import { PriceBreakdownModal } from './PriceBreakdownModal';
-import { EmptyState } from './EmptyState'; // Import the new EmptyState component
+import { EmptyState } from './EmptyState';
 
 interface ClientDashboardProps {
   user: User;
 }
+
+// This sub-component is where the fixes are applied
+const BookingStatusTracker = ({ booking, reviews, user, onChatClick, onReviewClick }: { booking: BookingRequest, reviews: Review[], user: User, onChatClick: (booking: BookingRequest) => void, onReviewClick: (booking: BookingRequest) => void }) => {
+    const statuses: BookingRequest['status'][] = ['pending', 'awaiting-payment', 'confirmed', 'in-progress', 'completed'];
+    const currentStatusIndex = statuses.indexOf(booking.status);
+    const isRejected = booking.status === 'rejected';
+    const isAwaitingPayment = booking.status === 'awaiting-payment';
+    const isCompleted = booking.status === 'completed'; // Moved this definition here
+
+    const hasReviewed = reviews.some(
+      (review) => review.bookingId === booking.id && review.clientId === user.uid
+    );
+
+    return (
+      <div className="bg-white rounded-2xl shadow-card p-6 border hover:border-primary-200 transition-all flex flex-col animate-fade-in-up">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h3 className="font-bold text-xl text-neutral-900">{booking.packageName}</h3>
+            <p className="text-sm text-neutral-500">Booked on: {booking.createdAt?.seconds ? new Date(booking.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
+            <p className="text-sm text-neutral-500">Event Date: {new Date(booking.eventDate).toLocaleDateString()}</p>
+            <p className="text-sm text-neutral-500">Guests: {booking.guestCount}</p>
+          </div>
+          <span className={`font-bold text-lg ${isRejected ? 'text-danger-500' : 'text-primary-600'}`}>
+            {isRejected ? 'Rejected' : `$${booking.totalPrice.toLocaleString()}`}
+          </span>
+        </div>
+
+        <div className="flex-grow">
+          {isRejected ? (
+            <div className="flex items-center p-4 bg-danger-50 rounded-lg">
+              <XCircle className="w-8 h-8 text-danger-500 mr-4" />
+              <div>
+                <h4 className="font-semibold text-danger-800">Booking Rejected</h4>
+                <p className="text-sm text-danger-700">Unfortunately, we are unable to proceed with this booking. Please contact support for more details.</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {booking.customizations && booking.customizations.length > 0 && (
+                <div className="mb-4">
+                  <h4 className="font-semibold text-neutral-800 text-sm mb-2">Customizations:</h4>
+                  <ul className="text-sm text-neutral-600 list-disc list-inside">
+                    {booking.customizations.map((custom, idx) => (
+                      <li key={idx}>{custom.name} - ${custom.category === 'catering' && booking.guestCount
+                        ? (custom.price * booking.guestCount).toLocaleString()
+                        : custom.price.toLocaleString()}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {booking.requirements && (
+                <div className="mb-4">
+                  <h4 className="font-semibold text-neutral-800 text-sm mb-2">Special Requirements:</h4>
+                  <p className="text-sm text-neutral-600 italic">"{booking.requirements}"</p>
+                </div>
+              )}
+
+              <div className="relative pt-4">
+                <div className="absolute left-4 top-6 h-[calc(100%-2rem)] w-0.5 bg-neutral-200"></div>
+
+                {statuses.map((status, index) => {
+                  const isCompletedStep = index < currentStatusIndex;
+                  const isCurrentStep = index === currentStatusIndex;
+                  const isFutureStep = index > currentStatusIndex;
+                  
+                  return (
+                    <div key={status} className="flex items-start mb-6 relative">
+                      <div className={`z-10 w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                        isCompletedStep ? 'bg-primary-600' : 
+                        isCurrentStep ? 'bg-primary-600' : 
+                        'bg-neutral-300'
+                      }`}>
+                        {isCompletedStep && <Check className="w-5 h-5 text-white" />}
+                        {isCurrentStep && <Loader className="w-5 h-5 text-white animate-spin" />} {/* Changed LoaderCircle to Loader */}
+                      </div>
+                      <div className="ml-4">
+                        <h4 className={`font-semibold transition-colors duration-300 ${isFutureStep ? 'text-neutral-500' : 'text-neutral-900'}`}>
+                          {status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ')}
+                        </h4>
+                        <p className="text-sm text-neutral-500">
+                          {isCurrentStep ? "Current Status" : isCompletedStep ? "Completed" : "Pending"}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="mt-auto pt-4 border-t border-neutral-100 flex flex-col gap-2">
+           {isAwaitingPayment && (
+            <button
+              onClick={() => toast.success("Redirecting to payment gateway...")}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <DollarSign className="w-4 h-4" />
+              Proceed to Payment
+            </button>
+          )}
+
+          <button
+            onClick={() => onChatClick(booking)}
+            disabled={isRejected}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-neutral-700 bg-neutral-200 rounded-lg hover:bg-neutral-300 transition-colors disabled:bg-neutral-300 disabled:cursor-not-allowed"
+          >
+            <MessageSquare className="w-4 h-4" />
+            {isRejected ? 'Chat Unavailable' : 'Contact Admin'}
+          </button>
+
+          {isCompleted && !hasReviewed && (
+            <button
+              onClick={() => onReviewClick(booking)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
+            >
+              <Star className="w-4 h-4" />
+              Leave a Review
+            </button>
+          )}
+
+          {isCompleted && hasReviewed && (
+            <button
+              disabled
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-neutral-200 text-neutral-600 rounded-lg cursor-not-allowed"
+            >
+              <Check className="w-4 h-4" />
+              Review Submitted
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
+  
 
 const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
   // --- STATE DECLARATIONS ---
@@ -148,21 +285,23 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     }
   };
 
-  const filteredPackages = eventPackages
-    // This client-side filter is now redundant but safe to keep
-    .filter(pkg => !pkg.isArchived) 
-    .filter(pkg => {
-      if (view === 'saved' && !wishlist.includes(pkg.id)) return false;
-      if (searchTerm && !pkg.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-      return true;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'price-asc': return a.basePrice - b.basePrice;
-        case 'price-desc': return b.basePrice - a.basePrice;
-        default: return 0;
-      }
-    });
+  const filteredPackages = useMemo(() => {
+    return eventPackages
+      // This client-side filter is now redundant but safe to keep
+      .filter(pkg => !pkg.isArchived)
+      .filter(pkg => {
+        if (view === 'saved' && !wishlist.includes(pkg.id)) return false;
+        if (searchTerm && !pkg.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        switch (sortBy) {
+          case 'price-asc': return a.basePrice - b.basePrice;
+          case 'price-desc': return b.basePrice - a.basePrice;
+          default: return 0;
+        }
+      });
+  }, [eventPackages, view, wishlist, searchTerm, sortBy]);
 
   const getTotalPrice = () => {
     if (!selectedPackage) return 0;
@@ -336,138 +475,10 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
     );
   };
 
-  const BookingStatusTracker = ({ booking }: { booking: BookingRequest }) => {
-    const statuses: BookingRequest['status'][] = ['pending', 'awaiting-payment', 'confirmed', 'in-progress', 'completed'];
-    const currentStatusIndex = statuses.indexOf(booking.status);
-    const isRejected = booking.status === 'rejected';
-    const isCompleted = booking.status === 'completed';
-
-    const hasReviewed = reviews.some(
-      (review) => review.bookingId === booking.id && review.clientId === user.uid
-    );
-    const isAwaitingPayment = booking.status === 'awaiting-payment';
-
-    return (
-      <div className="bg-white rounded-2xl shadow-card p-6 border hover:border-primary-200 transition-all flex flex-col animate-fade-in-up">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="font-bold text-xl text-neutral-900">{booking.packageName}</h3>
-            <p className="text-sm text-neutral-500">Booked on: {booking.createdAt?.seconds ? new Date(booking.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}</p>
-            <p className="text-sm text-neutral-500">Event Date: {new Date(booking.eventDate).toLocaleDateString()}</p>
-            <p className="text-sm text-neutral-500">Guests: {booking.guestCount}</p>
-          </div>
-          <span className={`font-bold text-lg ${isRejected ? 'text-danger-500' : 'text-primary-600'}`}>
-            {isRejected ? 'Rejected' : `$${booking.totalPrice.toLocaleString()}`}
-          </span>
-        </div>
-
-        <div className="flex-grow">
-          {isRejected ? (
-            <div className="flex items-center p-4 bg-danger-50 rounded-lg">
-              <XCircle className="w-8 h-8 text-danger-500 mr-4" />
-              <div>
-                <h4 className="font-semibold text-danger-800">Booking Rejected</h4>
-                <p className="text-sm text-danger-700">Unfortunately, we are unable to proceed with this booking. Please contact support for more details.</p>
-              </div>
-            </div>
-          ) : (
-            <>
-              {booking.customizations && booking.customizations.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="font-semibold text-neutral-800 text-sm mb-2">Customizations:</h4>
-                  <ul className="text-sm text-neutral-600 list-disc list-inside">
-                    {booking.customizations.map((custom, idx) => (
-                      <li key={idx}>{custom.name} - ${custom.category === 'catering' && booking.guestCount
-                        ? (custom.price * booking.guestCount).toLocaleString()
-                        : custom.price.toLocaleString()}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {booking.requirements && (
-                <div className="mb-4">
-                  <h4 className="font-semibold text-neutral-800 text-sm mb-2">Special Requirements:</h4>
-                  <p className="text-sm text-neutral-600 italic">"{booking.requirements}"</p>
-                </div>
-              )}
-
-              <div className="relative pt-4">
-                <div className="absolute left-4 top-6 h-[calc(100%-2rem)] w-0.5 bg-neutral-200"></div>
-
-                {statuses.map((status, index) => (
-                  <div key={status} className="flex items-start mb-6 relative">
-                    <div className={`z-10 w-8 h-8 rounded-full flex items-center justify-center ${index <= currentStatusIndex ? 'bg-primary-600' : 'bg-neutral-300'}`}>
-                      <Check className="w-5 h-5 text-white" />
-                    </div>
-                    <div className="ml-4">
-                      <h4 className={`font-semibold ${index <= currentStatusIndex ? 'text-neutral-900' : 'text-neutral-500'}`}>
-                        {status.charAt(0).toUpperCase() + status.slice(1).replace('-', ' ')}
-                      </h4>
-                      <p className="text-sm text-neutral-500">
-                        {booking.status === status ? "Current Status" : index < currentStatusIndex ? "Completed" : "Pending"}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="mt-auto pt-4 border-t border-neutral-100 flex flex-col gap-2">
-           {isAwaitingPayment && (
-            <button
-              onClick={() => toast.success("Redirecting to payment gateway...")}
-              className="btn-primary w-full bg-gradient-to-r from-success-600 to-green-500"
-            >
-              <DollarSign className="w-4 h-4 mr-2" />
-              Proceed to Payment
-            </button>
-          )}
-
-          <button
-            onClick={() => {
-              setSelectedBookingForChat(booking);
-              setIsChatOpen(true);
-            }}
-            disabled={isRejected}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-secondary-600 rounded-lg hover:bg-secondary-700 transition-colors disabled:bg-neutral-300 disabled:cursor-not-allowed"
-          >
-            <MessageSquare className="w-4 h-4" />
-            {isRejected ? 'Booking Rejected' : 'Contact Admin'}
-          </button>
-
-          {isCompleted && !isRejected && !hasReviewed && (
-            <button
-              onClick={() => {
-                setSelectedBookingForReview(booking);
-                setIsReviewOpen(true);
-              }}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
-            >
-              <Star className="w-4 h-4" />
-              Leave a Review
-            </button>
-          )}
-          {isCompleted && !isRejected && hasReviewed && (
-            <button
-              disabled
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-neutral-200 text-neutral-600 rounded-lg cursor-not-allowed"
-            >
-              <Check className="w-4 h-4" />
-              Review Submitted
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  };
-
+  // Main render logic starts here
   if (currentStep === 'packages') {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="animate-fade-in-up">
         {isChatOpen && selectedBookingForChat && (
           <ChatModal
             isOpen={isChatOpen}
@@ -484,138 +495,162 @@ const ClientDashboard: React.FC<ClientDashboardProps> = ({ user }) => {
           booking={selectedBookingForReview}
         />
 
-        <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-neutral-900 mb-4">Welcome back, {user.name}!</h2>
-          <p className="text-xl text-neutral-600 max-w-3xl mx-auto">
-            Choose from our curated event packages or customize your own perfect celebration.
-          </p>
-        </div>
-
-        <div className="mb-8 p-4 bg-white/50 rounded-2xl shadow-md border border-neutral-200">
-          <div className="grid md:grid-cols-3 gap-4 items-center">
-            <div className="relative md:col-span-2">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
-              <input
-                type="text"
-                placeholder="Search for packages..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-1">Sort by</label>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'default' | 'price-asc' | 'price-desc')}
-                className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="default">Default</option>
-                <option value="price-asc">Price: Low to High</option>
-                <option value="price-desc">Price: High to Low</option>
-              </select>
-            </div>
+        {/* --- HERO SECTION --- */}
+        <div className="relative h-80 bg-cover bg-center rounded-b-3xl overflow-hidden mb-12 shadow-lg" style={{ backgroundImage: 'url(https://images.pexels.com/photos/1730877/pexels-photo-1730877.jpeg)' }}>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/20"></div>
+          <div className="relative h-full flex flex-col justify-end p-8 md:p-12">
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-2 animate-fade-in-up">Welcome back, {user.name}!</h2>
+            <p className="text-xl text-white/90 max-w-3xl animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+              KAISRI helps you create unforgettable events. Let's start planning your next celebration.
+            </p>
           </div>
         </div>
 
-        <div className="flex justify-center mb-8">
-          <div className="bg-neutral-200 rounded-full p-1 flex">
-            <button onClick={() => setView('all')} className={`px-6 py-2 rounded-full text-sm font-medium ${view === 'all' ? 'bg-white text-neutral-900 shadow' : 'text-neutral-600'}`}>
-              All Packages
-            </button>
-            <button onClick={() => setView('saved')} className={`px-6 py-2 rounded-full text-sm font-medium ${view === 'saved' ? 'bg-white text-neutral-900 shadow' : 'text-neutral-600'}`}>
-              Saved ({wishlist.length})
-            </button>
-            <button onClick={() => setView('bookings')} className={`px-6 py-2 rounded-full text-sm font-medium ${view === 'bookings' ? 'bg-white text-neutral-900 shadow' : 'text-neutral-600'}`}>
-              My Bookings ({bookings.length})
-            </button>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* --- FILTER & SORT BAR (Glassmorphism) --- */}
+          <div className="sticky top-20 z-40 mb-8 card-modern p-4">
+            <div className="grid md:grid-cols-3 gap-4 items-center">
+              <div className="relative md:col-span-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
+                <input
+                  type="text"
+                  placeholder="Search for packages..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Sort by</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'default' | 'price-asc' | 'price-desc')}
+                  className="w-full px-4 py-3 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="default">Default</option>
+                  <option value="price-asc">Price: Low to High</option>
+                  <option value="price-desc">Price: High to Low</option>
+                </select>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {view === 'all' || view === 'saved' ? (
-          filteredPackages.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-8">
-              {filteredPackages.map((pkg) => {
-                const isWishlisted = wishlist.includes(pkg.id);
-                const rating = getPackageRating(pkg.id);
-                return (
-                  <div key={pkg.id} className="bg-white rounded-2xl shadow-card overflow-hidden transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1">
-                    <div className="relative h-64">
-                      <img src={pkg.image} alt={pkg.name} className="w-full h-full object-cover" />
-                      <button onClick={(e) => { e.stopPropagation(); toggleWishlist(pkg.id); }} className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm p-2 rounded-full hover:bg-white transition-colors">
-                        <Heart className={`w-5 h-5 ${isWishlisted ? 'text-danger-500 fill-current' : 'text-neutral-600'}`} />
-                      </button>
-                      {pkg.popular && (
-                        <div className="absolute top-4 left-4 bg-gradient-to-r from-primary-600 to-secondary-500 text-white px-3 py-1 rounded-full text-sm font-medium shadow">
-                          <Star className="w-4 h-4 inline mr-1" /> Popular
+          {/* --- TABS --- */}
+          <div className="flex justify-center mb-8">
+            <div className="bg-neutral-200 rounded-full p-1 flex">
+              <button onClick={() => setView('all')} className={`px-6 py-2 rounded-full text-sm font-medium ${view === 'all' ? 'bg-white text-neutral-900 shadow' : 'text-neutral-600'}`}>
+                All Packages
+              </button>
+              <button onClick={() => setView('saved')} className={`px-6 py-2 rounded-full text-sm font-medium ${view === 'saved' ? 'bg-white text-neutral-900 shadow' : 'text-neutral-600'}`}>
+                Saved ({wishlist.length})
+              </button>
+              <button onClick={() => setView('bookings')} className={`px-6 py-2 rounded-full text-sm font-medium ${view === 'bookings' ? 'bg-white text-neutral-900 shadow' : 'text-neutral-600'}`}>
+                My Bookings ({bookings.length})
+              </button>
+            </div>
+          </div>
+
+          {/* --- PACKAGES GRID --- */}
+          {view === 'all' || view === 'saved' ? (
+            filteredPackages.length > 0 ? (
+              <div className="grid md:grid-cols-2 lg:grid-cols-2 gap-8">
+                {filteredPackages.map((pkg) => {
+                  const isWishlisted = wishlist.includes(pkg.id);
+                  const rating = getPackageRating(pkg.id);
+                  return (
+                    <div key={pkg.id} className="bg-white rounded-2xl shadow-card overflow-hidden transition-all duration-300 hover:shadow-card-hover hover:-translate-y-1 hover-scale">
+                      <div className="relative h-64">
+                        <img src={pkg.image} alt={pkg.name} className="w-full h-full object-cover" />
+                        <button onClick={(e) => { e.stopPropagation(); toggleWishlist(pkg.id); }} className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm p-2 rounded-full hover:bg-white transition-colors">
+                          <Heart className={`w-5 h-5 ${isWishlisted ? 'text-danger-500 fill-current' : 'text-neutral-600'}`} />
+                        </button>
+                        {pkg.popular && (
+                          <div className="absolute top-4 left-4 bg-gradient-to-r from-primary-600 to-secondary-500 text-white px-3 py-1 rounded-full text-sm font-medium shadow">
+                            <Star className="w-4 h-4 inline mr-1" /> Popular
+                          </div>
+                        )}
+                        <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg shadow">
+                          <span className="text-xl font-bold text-neutral-900">${pkg.basePrice.toLocaleString()}</span>
+                          <span className="text-sm text-neutral-600 ml-1">base</span>
                         </div>
-                      )}
-                      <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-2 rounded-lg shadow">
-                        <span className="text-xl font-bold text-neutral-900">${pkg.basePrice.toLocaleString()}</span>
-                        <span className="text-sm text-neutral-600 ml-1">base</span>
                       </div>
-                    </div>
-                    <div className="p-6">
-                      <h3 className="text-xl font-bold text-neutral-900 mb-2">{pkg.name}</h3>
+                      <div className="p-6">
+                        <h3 className="text-xl font-bold text-neutral-900 mb-2">{pkg.name}</h3>
 
-                      <div className="flex items-center mb-3">
-                        <div className="flex">
-                          {[...Array(5)].map((_, i) => (
-                            <Star key={i} className={`w-5 h-5 ${i < Math.round(rating.average) ? 'text-warning-400 fill-current' : 'text-neutral-300'}`} />
+                        <div className="flex items-center mb-3">
+                          <div className="flex">
+                            {[...Array(5)].map((_, i) => (
+                              <Star key={i} className={`w-5 h-5 ${i < Math.round(rating.average) ? 'text-warning-400 fill-current' : 'text-neutral-300'}`} />
+                            ))}
+                          </div>
+                          <span className="ml-2 text-sm text-neutral-500">({rating.count} reviews)</span>
+                        </div>
+
+                        <p className="text-neutral-600 mb-4 h-12">{pkg.description}</p>
+                        <div className="space-y-2 mb-6">
+                          {pkg.features.map((feature, index) => (
+                            <div key={index} className="flex items-center text-sm text-neutral-700">
+                              <Check className="w-4 h-4 text-success-500 mr-2 flex-shrink-0" />
+                              <span>{feature}</span>
+                            </div>
                           ))}
                         </div>
-                        <span className="ml-2 text-sm text-neutral-500">({rating.count} reviews)</span>
-                      </div>
-
-                      <p className="text-neutral-600 mb-4 h-12">{pkg.description}</p>
-                      <div className="space-y-2 mb-6">
-                        {pkg.features.map((feature, index) => (
-                          <div key={index} className="flex items-center text-sm text-neutral-700">
-                            <Check className="w-4 h-4 text-success-500 mr-2 flex-shrink-0" />
-                            <span>{feature}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="flex gap-3 pt-4 border-t border-neutral-100">
-                        <button onClick={() => { setSelectedPackage(pkg); setCurrentStep('customize'); }} className="btn-primary flex-1 group">
-                          <span>Customize</span>
-                          <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                        </button>
-                        <button onClick={() => { setSelectedPackage(pkg); setCurrentStep('book'); }} className="px-6 py-2.5 border border-primary-200 text-primary-700 rounded-lg font-semibold hover:bg-primary-50 transition-colors">
-                          Book Now
-                        </button>
+                        <div className="flex gap-3 pt-4 border-t border-neutral-100">
+                          <button onClick={() => { setSelectedPackage(pkg); setCurrentStep('customize'); }} className="btn-primary flex-1 group">
+                            <span>Customize</span>
+                            <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                          </button>
+                          <button onClick={() => { setSelectedPackage(pkg); setCurrentStep('book'); }} className="px-6 py-2.5 border border-primary-200 text-primary-700 rounded-lg font-semibold hover:bg-primary-50 transition-colors">
+                            Book Now
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            // Empty state for Packages/Wishlist
-            <EmptyState
-              variant={view === 'saved' ? 'wishlist' : 'packages'}
-              onAction={() => setView('all')}
-            />
-          )
-        ) : (
-          <div className="grid md:grid-cols-2 gap-8">
-            {bookings.length > 0 ? (
-              bookings.map(booking => <BookingStatusTracker key={booking.id} booking={booking} />)
+                  );
+                })}
+              </div>
             ) : (
-              // Empty state for My Bookings
-              <EmptyState variant="bookings" onAction={() => setView('all')} />
-            )}
-          </div>
-        )}
+              // Empty state for Packages/Wishlist
+              <EmptyState
+                variant={view === 'saved' ? 'wishlist' : 'packages'}
+                onAction={() => setView('all')}
+              />
+            )
+          ) : (
+            <div className="grid md:grid-cols-2 gap-8">
+              {bookings.length > 0 ? (
+                bookings.map(booking =>
+                  <BookingStatusTracker
+                    key={booking.id}
+                    booking={booking}
+                    reviews={reviews}
+                    user={user}
+                    onChatClick={(b) => {
+                      setSelectedBookingForChat(b);
+                      setIsChatOpen(true);
+                    }}
+                    onReviewClick={(b) => {
+                      setSelectedBookingForReview(b);
+                      setIsReviewOpen(true);
+                    }}
+                  />
+                )
+              ) : (
+                // Empty state for My Bookings
+                <EmptyState variant="bookings" onAction={() => setView('all')} />
+              )}
+            </div>
+          )}
 
-        <div className="mt-16 bg-gradient-to-r from-primary-600 to-secondary-600 rounded-2xl p-8 text-center text-white">
-          <h3 className="text-2xl font-bold mb-4">Need Something Custom?</h3>
-          <p className="text-primary-100 mb-6 max-w-2xl mx-auto">
-            Our event planning experts can create a completely custom package tailored to your unique vision and requirements.
-          </p>
-          <button className="bg-white text-primary-600 px-6 py-3 rounded-xl font-medium hover:bg-neutral-100 transition-colors">
-            Contact Our Planners
-          </button>
+          <div className="mt-16 bg-gradient-to-r from-primary-600 to-secondary-600 rounded-2xl p-8 text-center text-white">
+            <h3 className="text-2xl font-bold mb-4">Need Something Custom?</h3>
+            <p className="text-primary-100 mb-6 max-w-2xl mx-auto">
+              Our event planning experts can create a completely custom package tailored to your unique vision and requirements.
+            </p>
+            <button className="bg-white text-primary-600 px-6 py-3 rounded-xl font-medium hover:bg-neutral-100 transition-colors">
+              Contact Our Planners
+            </button>
+          </div>
         </div>
       </div>
     );
